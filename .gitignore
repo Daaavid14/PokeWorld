@@ -1,0 +1,17 @@
+# Environment variables — NEVER commit these
+contracts/.env
+.env
+*.env
+
+# Hardhat build artifacts
+contracts/artifacts/
+contracts/cache/
+contracts/deployments.json
+
+# Node modules
+node_modules/
+contracts/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

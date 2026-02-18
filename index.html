@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0d0d1a" />
 
   <!-- Security Headers (also enforced server-side via vercel.json) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co; connect-src 'self' https://*.supabase.co;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org;" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
 

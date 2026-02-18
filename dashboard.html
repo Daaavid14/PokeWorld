@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://pokeapi.co; connect-src 'self' https://*.supabase.co;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org;" />
   <title>Dashboard | PokéWorld</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -167,43 +167,337 @@
 
       <!-- ---- PANEL: BATTLES ---- -->
       <section class="dash-panel hidden" id="battles" aria-labelledby="battlesTitle">
-        <h1 class="dash-title" id="battlesTitle">Battle Arena</h1>
-        <div class="coming-soon-panel">
-          <div class="cs-icon" aria-hidden="true">⚔️</div>
-          <h2>Battle Arena</h2>
-          <p>PvP battles are launching in <strong>Q2 2026</strong>. Join the waitlist to get early access!</p>
-          <button class="btn btn-primary" id="battlesWaitlistBtn">Join Battle Waitlist</button>
+        <h1 class="dash-title" id="battlesTitle">Battle Arena ⚔️</h1>
+
+        <!-- Battle mode tabs -->
+        <div class="battle-tabs" role="tablist">
+          <button class="battle-tab active" data-tab="quick">Quick Battle</button>
+          <button class="battle-tab" data-tab="ranked">Ranked</button>
+          <button class="battle-tab" data-tab="history">History</button>
+        </div>
+
+        <!-- Quick Battle -->
+        <div class="battle-pane" id="battleTab-quick">
+          <div class="battle-arena-wrap">
+
+            <!-- Opponent side -->
+            <div class="battle-side opponent-side">
+              <h3 class="side-label">Opponent</h3>
+              <div class="battle-pokemon-slot" id="opponentSlot">
+                <div class="slot-empty">Searching for opponent...</div>
+              </div>
+              <div class="battle-hp-wrap" id="opponentHp">
+                <div class="hp-bar-track"><div class="hp-bar-fill" id="opponentHpBar" style="width:100%"></div></div>
+                <span class="hp-text" id="opponentHpText">— HP</span>
+              </div>
+            </div>
+
+            <!-- VS divider -->
+            <div class="vs-divider" aria-hidden="true">VS</div>
+
+            <!-- Player side -->
+            <div class="battle-side player-side">
+              <h3 class="side-label">Your Pokémon</h3>
+              <div class="battle-pokemon-slot" id="playerSlot">
+                <div class="slot-empty">Select a Pokémon below ↓</div>
+              </div>
+              <div class="battle-hp-wrap" id="playerHp">
+                <div class="hp-bar-track"><div class="hp-bar-fill player-hp" id="playerHpBar" style="width:100%"></div></div>
+                <span class="hp-text" id="playerHpText">— HP</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Skill buttons (shown during battle) -->
+          <div class="battle-skills hidden" id="battleSkills">
+            <button class="skill-btn" id="skill1Btn"></button>
+            <button class="skill-btn" id="skill2Btn"></button>
+            <button class="skill-btn" id="skill3Btn"></button>
+            <button class="skill-btn" id="skill4Btn"></button>
+          </div>
+
+          <!-- Battle log -->
+          <div class="battle-log" id="battleLog" aria-live="polite">
+            <p class="log-entry">Choose your Pokémon to start a battle!</p>
+          </div>
+
+          <!-- Team selector -->
+          <div class="battle-team-select">
+            <h3 class="team-select-title">Select Your Fighter</h3>
+            <div class="battle-roster" id="battleRoster"></div>
+          </div>
+
+          <button class="btn btn-primary btn-lg" id="startBattleBtn" disabled>⚔️ Find Opponent</button>
+        </div>
+
+        <!-- Ranked (waitlist) -->
+        <div class="battle-pane hidden" id="battleTab-ranked">
+          <div class="coming-soon-panel">
+            <div class="cs-icon">🏆</div>
+            <h2>Ranked Battles</h2>
+            <p>Competitive ranked matchmaking launches <strong>Q2 2026</strong>. Join early to reserve your rank slot!</p>
+            <button class="btn btn-primary" id="battlesWaitlistBtn">Join Ranked Waitlist</button>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="battle-pane hidden" id="battleTab-history">
+          <div class="battle-history-list" id="battleHistoryList">
+            <div class="activity-empty">No battles fought yet. Start your first battle!</div>
+          </div>
         </div>
       </section>
 
       <!-- ---- PANEL: MARKETPLACE ---- -->
       <section class="dash-panel hidden" id="marketplace" aria-labelledby="marketplaceTitle">
-        <h1 class="dash-title" id="marketplaceTitle">Marketplace</h1>
-        <div class="coming-soon-panel">
-          <div class="cs-icon" aria-hidden="true">🛒</div>
-          <h2>Marketplace v1</h2>
-          <p>Trade Pokémon with trainers worldwide. Launching alongside the Battle Arena in <strong>Q2 2026</strong>.</p>
-          <button class="btn btn-primary" id="marketWaitlistBtn">Notify Me</button>
+        <h1 class="dash-title" id="marketplaceTitle">Marketplace 🛒</h1>
+
+        <!-- Market tabs -->
+        <div class="battle-tabs" role="tablist">
+          <button class="battle-tab active" data-tab="shop">🏪 Shop</button>
+          <button class="battle-tab" data-tab="buy">🛒 Buy P2P</button>
+          <button class="battle-tab" data-tab="sell">📦 Sell / List</button>
+          <button class="battle-tab" data-tab="my-listings">📋 My Listings</button>
+        </div>
+
+        <!-- SHOP tab — mint new base Pokémon -->
+        <div class="market-pane" id="marketTab-shop">
+          <div class="shop-header">
+            <p class="sell-hint">Mint new base Pokémon NFTs directly to your wallet. Prices are in POKÉ tokens.</p>
+            <div class="shop-pack-banner">
+              <div class="pack-info">
+                <span class="pack-icon">🎁</span>
+                <div>
+                  <strong>Random Pack</strong>
+                  <span class="pack-sub">3 random base Pokémon — 250 POKÉ</span>
+                </div>
+              </div>
+              <button class="btn btn-primary" id="buyPackBtn">Buy Random Pack</button>
+            </div>
+          </div>
+
+          <h3 class="sell-title" style="margin-top:1.5rem">Pick Your Pokémon — 100 POKÉ each</h3>
+          <div class="panel-toolbar" style="margin-bottom:1rem">
+            <input type="search" id="shopSearch" placeholder="Search species..." class="search-input" maxlength="30" />
+            <select id="shopTypeFilter" class="filter-select">
+              <option value="all">All Types</option>
+              <option value="fire">🔥 Fire</option>
+              <option value="water">💧 Water</option>
+              <option value="grass">🌿 Grass</option>
+              <option value="electric">⚡ Electric</option>
+              <option value="dragon">🐉 Dragon</option>
+              <option value="ice">❄️ Ice</option>
+              <option value="ghost">👻 Ghost</option>
+              <option value="fighting">🥊 Fighting</option>
+              <option value="normal">Normal</option>
+              <option value="bug">🐛 Bug</option>
+              <option value="rock">🪨 Rock</option>
+            </select>
+            <select id="shopRarityFilter" class="filter-select">
+              <option value="all">All Rarities</option>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+            </select>
+          </div>
+          <div class="cards-grid" id="shopGrid" style="margin-top:0"></div>
+        </div>
+
+        <!-- BUY P2P tab -->
+        <div class="market-pane hidden" id="marketTab-buy">
+          <div class="panel-toolbar">
+            <input type="search" id="marketSearch" placeholder="Search Pokémon..."
+                   class="search-input" aria-label="Search marketplace" maxlength="50" />
+            <select id="marketTypeFilter" class="filter-select" aria-label="Filter by type">
+              <option value="all">All Types</option>
+              <option value="fire">🔥 Fire</option>
+              <option value="water">💧 Water</option>
+              <option value="grass">🌿 Grass</option>
+              <option value="electric">⚡ Electric</option>
+              <option value="dragon">🐉 Dragon</option>
+              <option value="normal">Normal</option>
+            </select>
+            <select id="marketStageFilter" class="filter-select" aria-label="Filter by stage">
+              <option value="all">All Stages</option>
+              <option value="base">Base Form</option>
+              <option value="second">Second Form</option>
+              <option value="third">Final Form</option>
+            </select>
+            <select id="marketSortFilter" class="filter-select" aria-label="Sort by">
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="level-desc">Highest Level</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
+          <div class="cards-grid" id="marketGrid">
+            <div class="empty-state"><p>Loading marketplace listings...</p></div>
+          </div>
+        </div>
+
+        <!-- SELL tab -->
+        <div class="market-pane hidden" id="marketTab-sell">
+          <div class="sell-wrapper">
+            <h2 class="sell-title">List a Pokémon for Sale</h2>
+            <p class="sell-hint">Select one of your Pokémon and set a POKÉ price to list it on the marketplace.</p>
+            <div class="sell-picker" id="sellPicker">
+              <div class="empty-state"><p>Loading your Pokémon...</p></div>
+            </div>
+            <div class="sell-form hidden" id="sellForm">
+              <div class="selected-poke-preview" id="sellPreview"></div>
+              <div class="form-group">
+                <label for="sellPrice">Price (POKÉ)</label>
+                <input type="number" id="sellPrice" min="1" max="9999999"
+                       placeholder="e.g. 500" class="search-input" />
+              </div>
+              <div class="form-group">
+                <label for="sellDuration">Listing Duration</label>
+                <select id="sellDuration" class="filter-select">
+                  <option value="1">1 Day</option>
+                  <option value="3">3 Days</option>
+                  <option value="7" selected>7 Days</option>
+                  <option value="14">14 Days</option>
+                  <option value="30">30 Days</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" id="confirmListBtn">📦 List for Sale</button>
+              <button class="btn btn-ghost" id="cancelSellBtn">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MY LISTINGS tab -->
+        <div class="market-pane hidden" id="marketTab-my-listings">
+          <div class="cards-grid" id="myListingsGrid">
+            <div class="empty-state"><p>Loading your listings...</p></div>
+          </div>
+        </div>
+
+        <!-- Buy confirmation modal -->
+        <div class="modal-overlay hidden" id="buyModal" role="dialog" aria-modal="true" aria-labelledby="buyModalTitle">
+          <div class="modal modal-sm">
+            <h2 id="buyModalTitle">Confirm Purchase</h2>
+            <div id="buyModalContent"></div>
+            <div class="modal-actions">
+              <button class="btn btn-outline" id="buyModalCancel">Cancel</button>
+              <button class="btn btn-primary" id="buyModalConfirm">Buy Now</button>
+            </div>
+          </div>
         </div>
       </section>
 
       <!-- ---- PANEL: WALLET ---- -->
       <section class="dash-panel hidden" id="wallet" aria-labelledby="walletTitle">
         <h1 class="dash-title" id="walletTitle">Wallet</h1>
-        <div class="wallet-card" aria-label="Token Balance">
+
+        <!-- POKÉ in-game token balance -->
+        <div class="wallet-card" aria-label="POKÉ Token Balance">
           <div class="wallet-balance">
             <span class="wallet-label">POKÉ Balance</span>
             <span class="wallet-amount" id="walletBalance">0 POKÉ</span>
           </div>
-          <div class="wallet-actions">
-            <button class="btn btn-primary" disabled aria-disabled="true">Deposit</button>
-            <button class="btn btn-outline" disabled aria-disabled="true">Withdraw</button>
-          </div>
-          <p class="wallet-note">Wallet integration coming in Q2 2026.</p>
         </div>
+
+        <!-- Web3 Wallet Section -->
+        <div class="web3-wallet-section">
+          <h2 class="wallet-section-title">🔗 Connect Web3 Wallet</h2>
+
+          <!-- Disconnected state -->
+          <div id="walletDisconnected">
+            <p class="wallet-hint">Link your crypto wallet to buy, sell &amp; trade NFT Pokémon on-chain.</p>
+            <div class="wallet-options-grid">
+
+              <button class="wallet-option-btn" id="connectMetaMask"
+                      data-wallet="metamask" aria-label="Connect MetaMask">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"
+                     alt="MetaMask" class="wallet-logo" />
+                <span>MetaMask</span>
+              </button>
+
+              <button class="wallet-option-btn" id="connectWalletConnect"
+                      data-wallet="walletconnect" aria-label="Connect via WalletConnect">
+                <img src="https://avatars.githubusercontent.com/u/37784886?s=200"
+                     alt="WalletConnect" class="wallet-logo" />
+                <span>WalletConnect</span>
+              </button>
+
+              <button class="wallet-option-btn" id="connectCoinbase"
+                      data-wallet="coinbase" aria-label="Connect Coinbase Wallet">
+                <img src="https://avatars.githubusercontent.com/u/1885080?s=200"
+                     alt="Coinbase Wallet" class="wallet-logo" />
+                <span>Coinbase</span>
+              </button>
+
+              <button class="wallet-option-btn" id="connectPhantom"
+                      data-wallet="phantom" aria-label="Connect Phantom Wallet">
+                <img src="https://raw.githubusercontent.com/phantom-labs/press-kit/main/Phantom_SVG_Icon.svg"
+                     alt="Phantom" class="wallet-logo" />
+                <span>Phantom</span>
+              </button>
+
+              <button class="wallet-option-btn" id="connectTrust"
+                      data-wallet="trust" aria-label="Connect Trust Wallet">
+                <img src="https://avatars.githubusercontent.com/u/32179889?s=200"
+                     alt="Trust Wallet" class="wallet-logo" />
+                <span>Trust Wallet</span>
+              </button>
+
+              <button class="wallet-option-btn" id="connectBrave"
+                      data-wallet="brave" aria-label="Connect Brave Wallet">
+                <img src="https://brave.com/static-assets/images/brave-logo-no-shadow.png"
+                     alt="Brave Wallet" class="wallet-logo" />
+                <span>Brave Wallet</span>
+              </button>
+
+            </div>
+            <p class="wallet-note">Don't have a wallet? <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Get MetaMask free →</a></p>
+          </div>
+
+          <!-- Connected state (hidden until wallet connected) -->
+          <div id="walletConnected" class="hidden">
+            <div class="connected-wallet-card">
+              <div class="connected-wallet-header">
+                <span class="connected-dot"></span>
+                <span class="connected-label">Connected</span>
+                <span class="wallet-type-display badge-wallet"></span>
+              </div>
+              <div class="connected-wallet-details">
+                <div class="wallet-detail-row">
+                  <span class="detail-lbl">Address</span>
+                  <span class="wallet-address-display detail-val">—</span>
+                  <button class="btn-icon" id="copyAddressBtn" title="Copy full address">📋</button>
+                </div>
+                <div class="wallet-detail-row">
+                  <span class="detail-lbl">Network</span>
+                  <span class="wallet-chain-display detail-val">—</span>
+                </div>
+              </div>
+              <div class="connected-wallet-actions">
+                <button class="btn btn-outline" id="switchNetworkBtn">Switch Network</button>
+                <button class="btn btn-danger-outline" id="disconnectWalletBtn">Disconnect</button>
+              </div>
+            </div>
+
+            <!-- Network selector (hidden by default) -->
+            <div class="network-selector hidden" id="networkSelector">
+              <h3 class="network-selector-title">Select Network</h3>
+              <div class="network-options">
+                <button class="network-opt" data-chainid="1">Ethereum</button>
+                <button class="network-opt" data-chainid="137">Polygon</button>
+                <button class="network-opt" data-chainid="56">BNB Chain</button>
+                <button class="network-opt" data-chainid="8453">Base</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wallet error message -->
+          <div class="wallet-error hidden" id="walletError" role="alert"></div>
+        </div>
+
         <div class="transaction-list" id="transactionList">
           <h3>Transaction History</h3>
-          <div class="activity-empty">No transactions yet.</div>
+          <div class="activity-empty" id="txEmptyState">No transactions yet. Connect a wallet to get started.</div>
+          <div id="txList" class="hidden"></div>
         </div>
       </section>
 
@@ -291,8 +585,12 @@
   <!-- Toast -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
   <script src="/js/config.js"></script>
   <script src="/js/auth.js"></script>
+  <script src="/js/wallet.js"></script>
+  <script src="/js/evolution.js"></script>
+  <script src="/js/blockchain.js"></script>
   <script src="/js/dashboard.js"></script>
 </body>
 </html>

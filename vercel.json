@@ -33,7 +33,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co; connect-src 'self' https://*.supabase.co;"
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org;"
         }
       ]
     },

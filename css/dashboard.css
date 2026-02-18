@@ -417,6 +417,539 @@
 }
 #deleteConfirmInput:focus { border-color: var(--clr-red); }
 
+/* ============================================================
+   NFT POKEMON CARDS (evolution engine cards)
+   ============================================================ */
+.nft-card {
+  position: relative;
+  background: var(--clr-bg-3);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.nft-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  border-color: var(--clr-cyan);
+}
+.nft-card-badge {
+  position: absolute;
+  top: 10px; right: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.rarity-badge-common    { background: rgba(150,150,150,0.25); color: #aaa; }
+.rarity-badge-uncommon  { background: rgba(0,230,118,0.2);   color: #00e676; }
+.rarity-badge-rare      { background: rgba(33,150,243,0.25); color: #42a5f5; }
+.rarity-badge-epic      { background: rgba(156,39,176,0.25); color: #ce93d8; }
+.rarity-badge-legendary { background: rgba(255,193,7,0.25);  color: #ffd54f; }
+
+.nft-gif-wrap {
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  padding: 12px;
+}
+.nft-gif {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+}
+
+.nft-card-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.nft-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.stage-badge {
+  font-size: 0.62rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stage-base   { background: rgba(255,255,255,0.1); color: #ccc; }
+.stage-second { background: rgba(33,150,243,0.2);  color: #64b5f6; }
+.stage-third  { background: rgba(255,193,7,0.2);    color: #ffd54f; }
+
+.nft-level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.level-lbl { color: var(--text-secondary); font-weight: 600; }
+
+.xp-wrap { display: flex; flex-direction: column; gap: 3px; }
+.xp-bar {
+  height: 5px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--clr-cyan), var(--clr-yellow));
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.xp-lbl { font-size: 0.65rem; color: var(--text-muted); }
+
+.nft-stats-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.nft-skills-row { font-size: 0.72rem; }
+.skill-chip {
+  background: rgba(255,255,255,0.06);
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-right: 4px;
+}
+
+/* Evolve button */
+.btn-evolve {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  padding: 7px 12px;
+  border-radius: 10px;
+  animation: pulseGlow 2s infinite;
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(255,210,50,0.3); }
+  50%       { box-shadow: 0 0 16px rgba(255,210,50,0.7); }
+}
+.evolve-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-align: center;
+}
+.max-stage { color: var(--clr-yellow) !important; }
+
+/* ============================================================
+   WALLET PANEL
+   ============================================================ */
+.web3-wallet-section {
+  background: var(--clr-bg-3);
+  border: 1px solid var(--clr-border);
+  border-radius: 16px;
+  padding: var(--space-xl);
+  margin-top: var(--space-lg);
+}
+.wallet-section-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+}
+.wallet-hint { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: var(--space-lg); }
+.wallet-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.wallet-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 12px;
+  background: var(--clr-surface);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, background 0.2s;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.wallet-option-btn:hover {
+  border-color: var(--clr-cyan);
+  background: rgba(0,229,255,0.06);
+  transform: translateY(-2px);
+}
+.wallet-option-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.wallet-logo {
+  width: 40px; height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.wallet-note { font-size: 0.8rem; color: var(--text-muted); }
+.wallet-note a { color: var(--clr-cyan); text-decoration: none; }
+.wallet-note a:hover { text-decoration: underline; }
+
+/* Connected wallet card */
+.connected-wallet-card {
+  background: var(--clr-surface);
+  border: 1.5px solid var(--clr-cyan);
+  border-radius: 14px;
+  padding: var(--space-lg);
+}
+.connected-wallet-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-md);
+}
+.connected-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #00e676;
+  box-shadow: 0 0 8px #00e676;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.connected-label { font-weight: 700; color: #00e676; }
+.badge-wallet {
+  background: rgba(0,229,255,0.15);
+  color: var(--clr-cyan);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.connected-wallet-details { display: flex; flex-direction: column; gap: 8px; margin-bottom: var(--space-md); }
+.wallet-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-lbl { color: var(--text-muted); font-size: 0.8rem; width: 70px; flex-shrink: 0; }
+.detail-val { font-weight: 600; font-size: 0.9rem; font-family: var(--font-display); }
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.btn-icon:hover { opacity: 1; }
+.connected-wallet-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Network selector */
+.network-selector {
+  background: var(--clr-bg-3);
+  border: 1px solid var(--clr-border);
+  border-radius: 12px;
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+}
+.network-selector-title { font-size: 0.9rem; margin-bottom: var(--space-sm); color: var(--text-secondary); }
+.network-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.network-opt {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.network-opt:hover { border-color: var(--clr-cyan); background: rgba(0,229,255,0.08); }
+
+/* Wallet error */
+.wallet-error {
+  background: rgba(244,67,54,0.1);
+  border: 1px solid rgba(244,67,54,0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #ef9a9a;
+  font-size: 0.85rem;
+  margin-top: var(--space-md);
+}
+
+/* ============================================================
+   BATTLE PANEL
+   ============================================================ */
+.battle-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--clr-border);
+  padding-bottom: var(--space-sm);
+}
+.battle-tab {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.battle-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+.battle-tab.active { color: var(--clr-cyan); border-bottom: 2px solid var(--clr-cyan); }
+.battle-pane { display: block; }
+.battle-pane.hidden { display: none; }
+
+.battle-arena-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-xl);
+  padding: var(--space-xl);
+  background: linear-gradient(135deg, rgba(0,0,0,0.4), rgba(20,20,40,0.6));
+  border: 1px solid var(--clr-border);
+  border-radius: 20px;
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+.battle-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+.side-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.battle-pokemon-slot {
+  width: 130px; height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px dashed var(--clr-border);
+  border-radius: 50%;
+  overflow: hidden;
+}
+.slot-empty { font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 8px; }
+.battle-gif { width: 110px; height: 110px; object-fit: contain; image-rendering: pixelated; }
+.battle-gif-player { transform: scaleX(-1); }
+.battle-pokemon-name { font-weight: 700; font-size: 0.9rem; }
+.battle-pokemon-level { font-size: 0.72rem; color: var(--clr-cyan); }
+
+.vs-divider {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--clr-yellow);
+  text-shadow: 0 0 20px rgba(255,210,50,0.5);
+  align-self: center;
+}
+
+.battle-hp-wrap { width: 100%; }
+.hp-bar-track {
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 140px;
+}
+.hp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f44336, #ff9800);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.player-hp { background: linear-gradient(90deg, #00e676, #00bcd4) !important; }
+.hp-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; display: block; }
+
+.battle-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+}
+.skill-btn {
+  background: var(--clr-surface);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.skill-btn:hover:not(:disabled) { background: rgba(0,229,255,0.1); border-color: var(--clr-cyan); }
+.skill-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.battle-log {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: var(--space-lg);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.log-entry { margin: 2px 0; line-height: 1.4; }
+
+.battle-team-select { margin-bottom: var(--space-md); }
+.team-select-title { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: var(--space-sm); }
+.battle-roster {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.roster-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--clr-surface);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  gap: 4px;
+  min-width: 72px;
+}
+.roster-chip:hover   { border-color: var(--clr-cyan); background: rgba(0,229,255,0.06); }
+.roster-chip.selected{ border-color: var(--clr-yellow); background: rgba(255,210,50,0.08); }
+.roster-gif  { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.roster-name { font-size: 0.68rem; font-weight: 600; text-align: center; }
+.roster-level{ font-size: 0.6rem; color: var(--clr-cyan); }
+
+.battle-history-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* ============================================================
+   MARKETPLACE PANEL
+   ============================================================ */
+.market-pane { display: block; }
+.market-pane.hidden { display: none; }
+
+.market-overlay {
+  padding: 10px 14px;
+  border-top: 1px solid var(--clr-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.market-price {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--clr-yellow);
+}
+.buy-btn, .cancel-listing-btn {
+  font-size: 0.75rem !important;
+  padding: 5px 12px !important;
+}
+.selected-for-sale { border-color: var(--clr-yellow) !important; }
+
+/* Sell panel */
+.sell-wrapper { max-width: 700px; }
+.sell-title { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: var(--space-sm); }
+.sell-hint { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: var(--space-lg); }
+.sell-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
+  gap: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+  margin-bottom: var(--space-lg);
+}
+.sell-form {
+  background: var(--clr-bg-3);
+  border: 1px solid var(--clr-border);
+  border-radius: 14px;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: 360px;
+}
+.selected-poke-preview { display: flex; align-items: center; gap: var(--space-md); }
+.sell-preview-gif { width: 60px; height: 60px; object-fit: contain; image-rendering: pixelated; }
+
+/* Buy modal */
+.buy-modal-body { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); text-align: center; }
+.buy-modal-gif { width: 80px; height: 80px; object-fit: contain; image-rendering: pixelated; }
+
+/* listing status badges */
+.listing-status-badge {
+  font-size: 0.62rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.status-active   .listing-status-badge { background: rgba(0,230,118,0.2); color: #00e676; }
+.status-sold     .listing-status-badge { background: rgba(33,150,243,0.2); color: #64b5f6; }
+.status-cancelled.listing-status-badge { background: rgba(150,150,150,0.2); color: #aaa; }
+
+/* ---- Shop (Mint) ---- */
+.shop-header { margin-bottom: 1rem; }
+
+.shop-pack-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(104,144,240,0.15), rgba(248,208,48,0.12));
+  border: 1px solid rgba(104,144,240,0.35);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-top: 0.75rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pack-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.pack-icon { font-size: 2rem; }
+.pack-sub  { font-size: 0.82rem; color: var(--text-muted); display: block; margin-top: 2px; }
+
+.shop-card {
+  /* extends .pokemon-card — no extra overrides needed */
+  cursor: default;
+  /* ensure flex column so button anchors to bottom */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.shop-card:hover {
+  box-shadow: 0 8px 28px rgba(104,144,240,0.3);
+}
+.shop-card .btn {
+  width: 100%;
+  margin-top: auto;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+/* shop grid uses tighter columns than the default 220px */
+#shopGrid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
   .sidebar {
@@ -431,9 +964,14 @@
   .dashboard-main { margin-left: 0; }
   .dash-panel { padding: var(--space-lg) var(--space-md); }
   .stats-grid { grid-template-columns: 1fr 1fr; }
+  .battle-arena-wrap { flex-direction: column; align-items: center; }
+  .vs-divider { transform: rotate(90deg); }
+  .wallet-options-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr; }
   .wallet-amount { font-size: 1.8rem; }
+  .wallet-options-grid { grid-template-columns: repeat(2, 1fr); }
+  .battle-skills { grid-template-columns: 1fr; }
 }
