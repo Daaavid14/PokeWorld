@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy | PokéWorld</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .legal-page { max-width: 800px; margin: 0 auto; padding: 120px 32px 64px; }
+    .legal-page h1 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 8px; }
+    .legal-page .updated { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 48px; }
+    .legal-page h2 { font-family: var(--font-display); font-size: 1rem; color: var(--clr-cyan); margin: 32px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .legal-page p, .legal-page li { color: var(--text-secondary); line-height: 1.8; margin-bottom: 12px; }
+    .legal-page ul { padding-left: 20px; list-style: disc; }
+    .back-link { display: inline-block; margin-bottom: 24px; color: var(--clr-yellow); font-size: 0.9rem; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="legal-page">
+    <a href="/" class="back-link">← Back to PokéWorld</a>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: February 18, 2026</p>
+
+    <h2>1. Information We Collect</h2>
+    <p>We collect information you provide when creating an account:</p>
+    <ul>
+      <li>Email address (required for authentication)</li>
+      <li>Trainer username (chosen by you)</li>
+      <li>Google profile information (only if you use Google OAuth)</li>
+    </ul>
+    <p>We also collect gameplay data: Pokémon owned, battle statistics, and POKÉ token balance.</p>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To authenticate you and secure your account</li>
+      <li>To display your trainer profile and stats</li>
+      <li>To send account-related emails (verification, password reset)</li>
+      <li>To send waitlist notifications (only if you opted in)</li>
+    </ul>
+
+    <h2>3. Data Storage & Security</h2>
+    <p>Your data is stored securely on <strong>Supabase</strong> (PostgreSQL). We enforce:</p>
+    <ul>
+      <li>Row Level Security (RLS) — you can only access your own data</li>
+      <li>HTTPS/TLS encryption in transit</li>
+      <li>Bcrypt-hashed passwords (handled by Supabase Auth)</li>
+    </ul>
+
+    <h2>4. Third-Party Services</h2>
+    <ul>
+      <li><strong>Supabase</strong> — database and authentication</li>
+      <li><strong>PokéAPI</strong> — open Pokémon data (no personal data shared)</li>
+      <li><strong>Google Fonts</strong> — typography (no personal data shared)</li>
+      <li><strong>Vercel</strong> — web hosting</li>
+    </ul>
+
+    <h2>5. Your Rights</h2>
+    <p>You may request deletion of your account and data at any time through the dashboard Settings page. Upon deletion, all personal data is permanently removed.</p>
+
+    <h2>6. Cookies</h2>
+    <p>We use localStorage to store your authentication session token. No third-party tracking cookies are used.</p>
+
+    <h2>7. Contact</h2>
+    <p>For privacy questions, contact us at <strong>privacy@pokeworld.app</strong>.</p>
+  </div>
+</body>
+</html>

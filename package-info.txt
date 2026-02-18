@@ -1,0 +1,21 @@
+# PokéWorld — Dependencies already pulled from CDN
+# No npm required — this is a pure HTML/CSS/JS project
+# Supabase SDK is loaded via CDN in each HTML file
+# Google Fonts are loaded via CDN in each HTML file
+
+# ==============================================================
+# This file exists only as documentation
+# ==============================================================
+# CDN Dependencies Used:
+#   - @supabase/supabase-js@2  → https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2
+#   - Google Fonts: Orbitron, Rajdhani
+
+# To run locally (no server required for static files):
+#   Option A: VS Code → Install "Live Server" extension → Right-click index.html → Open with Live Server
+#   Option B: npx serve .        (requires Node.js)
+#   Option C: python -m http.server 8080
+
+# To deploy to Vercel:
+#   1. Install Vercel CLI: npm i -g vercel
+#   2. Run: vercel
+#   3. Follow the prompts

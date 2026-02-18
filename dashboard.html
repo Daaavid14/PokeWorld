@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://pokeapi.co; connect-src 'self' https://*.supabase.co;" />
+  <title>Dashboard | PokéWorld</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+</head>
+<body class="dashboard-body">
+
+  <!-- ============================================================
+       DASHBOARD SIDEBAR
+  ============================================================ -->
+  <div class="dashboard-layout">
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Dashboard Navigation">
+      <div class="sidebar-header">
+        <a href="/" class="nav-logo sidebar-logo" aria-label="PokéWorld Home">
+          <img src="/assets/pokeball.svg" alt="" class="logo-icon" aria-hidden="true" />
+          <span class="logo-text">PokéWorld</span>
+        </a>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close Sidebar">&times;</button>
+      </div>
+
+      <!-- User Profile Snippet -->
+      <div class="sidebar-profile" id="sidebarProfile" aria-label="Trainer Profile">
+        <div class="profile-avatar" id="profileAvatar" aria-hidden="true">🎮</div>
+        <div class="profile-info">
+          <span class="profile-name" id="profileName">Loading...</span>
+          <span class="profile-rank" id="profileRank">Rookie Trainer</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul role="list">
+          <li><a href="#overview" class="sidebar-link active" data-panel="overview">
+            <span class="link-icon" aria-hidden="true">📊</span> Overview
+          </a></li>
+          <li><a href="#my-pokemon" class="sidebar-link" data-panel="my-pokemon">
+            <span class="link-icon" aria-hidden="true">🎴</span> My Pokémon
+          </a></li>
+          <li><a href="#battles" class="sidebar-link" data-panel="battles">
+            <span class="link-icon" aria-hidden="true">⚔️</span> Battles
+          </a></li>
+          <li><a href="#marketplace" class="sidebar-link" data-panel="marketplace">
+            <span class="link-icon" aria-hidden="true">🛒</span> Marketplace
+          </a></li>
+          <li><a href="#wallet" class="sidebar-link" data-panel="wallet">
+            <span class="link-icon" aria-hidden="true">💰</span> Wallet
+          </a></li>
+          <li><a href="#settings" class="sidebar-link" data-panel="settings">
+            <span class="link-icon" aria-hidden="true">⚙️</span> Settings
+          </a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-danger-outline sidebar-logout" id="dashLogoutBtn">
+          🚪 Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- ============================================================
+         MAIN CONTENT
+    ============================================================ -->
+    <main class="dashboard-main" id="dashMain" role="main">
+      <!-- Top Bar -->
+      <header class="dash-topbar">
+        <button class="hamburger hamburger-dash" id="sidebarToggle" aria-label="Toggle Sidebar" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-right">
+          <span class="token-badge" aria-label="POKÉ Token Balance">
+            <img src="/assets/poke-token.svg" alt="" aria-hidden="true" class="token-icon" />
+            <span id="tokenBalance">0</span> POKÉ
+          </span>
+          <span class="topbar-username" id="topbarUsername">Trainer</span>
+        </div>
+      </header>
+
+      <!-- ---- PANEL: OVERVIEW ---- -->
+      <section class="dash-panel active" id="overview" aria-labelledby="overviewTitle">
+        <h1 class="dash-title" id="overviewTitle">Trainer Overview</h1>
+
+        <div class="stats-grid">
+          <div class="dash-stat-card">
+            <span class="stat-icon" aria-hidden="true">🎴</span>
+            <div class="stat-info">
+              <span class="stat-val" id="totalPokemon">0</span>
+              <span class="stat-lbl">Total Pokémon</span>
+            </div>
+          </div>
+          <div class="dash-stat-card">
+            <span class="stat-icon" aria-hidden="true">⚔️</span>
+            <div class="stat-info">
+              <span class="stat-val" id="totalBattles">0</span>
+              <span class="stat-lbl">Battles Fought</span>
+            </div>
+          </div>
+          <div class="dash-stat-card">
+            <span class="stat-icon" aria-hidden="true">🏆</span>
+            <div class="stat-info">
+              <span class="stat-val" id="battleWins">0</span>
+              <span class="stat-lbl">Victories</span>
+            </div>
+          </div>
+          <div class="dash-stat-card">
+            <span class="stat-icon" aria-hidden="true">💰</span>
+            <div class="stat-info">
+              <span class="stat-val" id="totalEarned">0</span>
+              <span class="stat-lbl">POKÉ Earned</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Starter Pokemon -->
+        <div class="overview-section">
+          <h2 class="overview-section-title">Your Starter Pack</h2>
+          <p class="overview-hint" id="starterHint">Welcome, Trainer! Here are your 3 free Starter Pokémon.</p>
+          <div class="starter-grid" id="starterGrid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div class="overview-section">
+          <h2 class="overview-section-title">Recent Activity</h2>
+          <div class="activity-list" id="activityList">
+            <div class="activity-empty">No activity yet. Time to battle! ⚔️</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- PANEL: MY POKEMON ---- -->
+      <section class="dash-panel hidden" id="my-pokemon" aria-labelledby="myPokemonTitle">
+        <h1 class="dash-title" id="myPokemonTitle">My Pokémon</h1>
+        <div class="panel-toolbar">
+          <input type="search" id="pokemonSearch" placeholder="Search your Pokémon..." 
+                 class="search-input" aria-label="Search your Pokémon" maxlength="50" />
+          <select id="pokemonFilter" class="filter-select" aria-label="Filter by type">
+            <option value="all">All Types</option>
+            <option value="fire">Fire</option>
+            <option value="water">Water</option>
+            <option value="grass">Grass</option>
+            <option value="electric">Electric</option>
+            <option value="psychic">Psychic</option>
+            <option value="dragon">Dragon</option>
+            <option value="normal">Normal</option>
+          </select>
+        </div>
+        <div class="cards-grid" id="myPokemonGrid">
+          <div class="empty-state">
+            <p>Loading your Pokémon...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- PANEL: BATTLES ---- -->
+      <section class="dash-panel hidden" id="battles" aria-labelledby="battlesTitle">
+        <h1 class="dash-title" id="battlesTitle">Battle Arena</h1>
+        <div class="coming-soon-panel">
+          <div class="cs-icon" aria-hidden="true">⚔️</div>
+          <h2>Battle Arena</h2>
+          <p>PvP battles are launching in <strong>Q2 2026</strong>. Join the waitlist to get early access!</p>
+          <button class="btn btn-primary" id="battlesWaitlistBtn">Join Battle Waitlist</button>
+        </div>
+      </section>
+
+      <!-- ---- PANEL: MARKETPLACE ---- -->
+      <section class="dash-panel hidden" id="marketplace" aria-labelledby="marketplaceTitle">
+        <h1 class="dash-title" id="marketplaceTitle">Marketplace</h1>
+        <div class="coming-soon-panel">
+          <div class="cs-icon" aria-hidden="true">🛒</div>
+          <h2>Marketplace v1</h2>
+          <p>Trade Pokémon with trainers worldwide. Launching alongside the Battle Arena in <strong>Q2 2026</strong>.</p>
+          <button class="btn btn-primary" id="marketWaitlistBtn">Notify Me</button>
+        </div>
+      </section>
+
+      <!-- ---- PANEL: WALLET ---- -->
+      <section class="dash-panel hidden" id="wallet" aria-labelledby="walletTitle">
+        <h1 class="dash-title" id="walletTitle">Wallet</h1>
+        <div class="wallet-card" aria-label="Token Balance">
+          <div class="wallet-balance">
+            <span class="wallet-label">POKÉ Balance</span>
+            <span class="wallet-amount" id="walletBalance">0 POKÉ</span>
+          </div>
+          <div class="wallet-actions">
+            <button class="btn btn-primary" disabled aria-disabled="true">Deposit</button>
+            <button class="btn btn-outline" disabled aria-disabled="true">Withdraw</button>
+          </div>
+          <p class="wallet-note">Wallet integration coming in Q2 2026.</p>
+        </div>
+        <div class="transaction-list" id="transactionList">
+          <h3>Transaction History</h3>
+          <div class="activity-empty">No transactions yet.</div>
+        </div>
+      </section>
+
+      <!-- ---- PANEL: SETTINGS ---- -->
+      <section class="dash-panel hidden" id="settings" aria-labelledby="settingsTitle">
+        <h1 class="dash-title" id="settingsTitle">Account Settings</h1>
+
+        <!-- Profile Settings -->
+        <div class="settings-card" aria-label="Profile Settings">
+          <h2 class="settings-section-title">Profile</h2>
+          <form id="profileForm" novalidate aria-label="Update profile">
+            <div class="form-group">
+              <label for="settingsUsername">Trainer Name</label>
+              <input type="text" id="settingsUsername" name="username" maxlength="30" 
+                     pattern="^[a-zA-Z0-9_]+$" autocomplete="username" />
+              <span class="field-error" id="settingsUsernameErr" role="alert"></span>
+            </div>
+            <div class="form-group">
+              <label for="settingsEmail">Email</label>
+              <input type="email" id="settingsEmail" name="email" maxlength="254" 
+                     autocomplete="email" disabled aria-disabled="true" />
+              <span class="field-hint">Email cannot be changed here. Contact support.</span>
+            </div>
+            <div class="form-error" id="profileError" role="alert" aria-live="assertive"></div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </form>
+        </div>
+
+        <!-- Password Change -->
+        <div class="settings-card" aria-label="Change Password">
+          <h2 class="settings-section-title">Change Password</h2>
+          <form id="passwordForm" novalidate aria-label="Change password">
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <div class="password-wrap">
+                <input type="password" id="newPassword" name="new_password" 
+                       minlength="8" maxlength="128" autocomplete="new-password"
+                       placeholder="Min. 8 characters" />
+                <button type="button" class="toggle-pw" data-target="newPassword" aria-label="Toggle password visibility">👁</button>
+              </div>
+              <div class="pw-strength-bar" aria-hidden="true">
+                <div class="pw-strength-fill" id="pwStrengthFill2"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="confirmNewPassword">Confirm New Password</label>
+              <div class="password-wrap">
+                <input type="password" id="confirmNewPassword" name="confirm_password"
+                       minlength="8" maxlength="128" autocomplete="new-password"
+                       placeholder="Repeat new password" />
+                <button type="button" class="toggle-pw" data-target="confirmNewPassword" aria-label="Toggle password visibility">👁</button>
+              </div>
+              <span class="field-error" id="confirmNewPwErr" role="alert"></span>
+            </div>
+            <div class="form-error" id="passwordError" role="alert" aria-live="assertive"></div>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </form>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-card settings-danger" aria-label="Danger Zone">
+          <h2 class="settings-section-title danger-title">Danger Zone</h2>
+          <p>Deleting your account is permanent and cannot be undone. All your Pokémon and POKÉ tokens will be lost.</p>
+          <button class="btn btn-danger" id="deleteAccountBtn">Delete My Account</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div class="modal-overlay hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="modal modal-sm">
+      <h2 id="deleteModalTitle">⚠️ Delete Account?</h2>
+      <p>This action is <strong>irreversible</strong>. Type <strong>DELETE</strong> to confirm.</p>
+      <input type="text" id="deleteConfirmInput" placeholder="Type DELETE" maxlength="10" 
+             aria-label="Confirm deletion by typing DELETE" />
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="deleteCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="deleteConfirmBtn" disabled>Delete Forever</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!-- assets/pokeball.svg — Inline SVG Pokéball logo -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="PokéBall">
+  <!-- Outer circle -->
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#ffd500" stroke-width="3"/>
+
+  <!-- Top half (red → dark gradient) -->
+  <path d="M2 50 A48 48 0 0 1 98 50 Z" fill="url(#topGrad)"/>
+
+  <!-- Bottom half -->
+  <path d="M2 50 A48 48 0 0 0 98 50 Z" fill="#1a1a35"/>
+
+  <!-- Center line -->
+  <line x1="2" y1="50" x2="98" y2="50" stroke="#ffd500" stroke-width="3"/>
+
+  <!-- Center button -->
+  <circle cx="50" cy="50" r="12" fill="#1a1a35" stroke="#ffd500" stroke-width="3"/>
+  <circle cx="50" cy="50" r="6" fill="#ffd500"/>
+
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="topGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ff4444"/>
+      <stop offset="100%" stop-color="#cc0000"/>
+    </linearGradient>
+  </defs>
+</svg>
