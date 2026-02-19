@@ -975,3 +975,53 @@
   .wallet-options-grid { grid-template-columns: repeat(2, 1fr); }
   .battle-skills { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   BATCH MINT BAR (admin shop)
+   ============================================================ */
+.batch-mint-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: rgba(255, 200, 0, 0.08);
+  border: 1px solid var(--clr-yellow, #f5c518);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.batch-mint-bar #batchMintCount {
+  font-weight: 700;
+  color: var(--clr-yellow, #f5c518);
+  white-space: nowrap;
+}
+
+.batch-mint-bar #batchMintAddress {
+  flex: 1;
+  min-width: 200px;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+}
+
+/* Highlight selected cards in batch mode */
+.shop-card.batch-selected {
+  outline: 2px solid var(--clr-yellow, #f5c518);
+  box-shadow: 0 0 12px rgba(245, 197, 24, 0.4);
+}
+
+.batch-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--clr-yellow, #f5c518);
+  z-index: 2;
+}
+
+/* Shop cards need relative positioning for the checkbox overlay */
+.shop-card {
+  position: relative;
+}

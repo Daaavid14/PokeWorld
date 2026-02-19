@@ -36,6 +36,15 @@ function showToast(message, type = 'info', duration = 4000) {
   const container = document.getElementById('toastContainer');
   if (!container) return;
 
+  // Dismiss any existing toasts immediately so only one is visible at a time
+  container.querySelectorAll('.toast').forEach(existing => {
+    if (!existing._dismissing) {
+      existing._dismissing = true;
+      existing.classList.add('fade-out');
+      setTimeout(() => existing.remove(), 350);
+    }
+  });
+
   const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
 
   const toast = document.createElement('div');
@@ -48,8 +57,13 @@ function showToast(message, type = 'info', duration = 4000) {
   `;
 
   const dismiss = () => {
+    if (toast._dismissing) return;
+    toast._dismissing = true;
     toast.classList.add('fade-out');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    // Remove after the slide-out animation (0.3s) + small buffer.
+    // Using setTimeout instead of animationend so removal is guaranteed
+    // even when the browser skips or short-circuits the animation.
+    setTimeout(() => toast.remove(), 350);
   };
 
   toast.querySelector('.toast-close').addEventListener('click', dismiss);

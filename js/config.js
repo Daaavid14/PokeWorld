@@ -22,7 +22,14 @@ const SUPABASE_ANON = 'sb_publishable_MryKpCqBeThpal3TyKucGw_r3VrvGsI';
 const CHAIN_CONFIG = {
   chainId:        11155111,
   chainName:      'Sepolia Testnet',
-  rpcUrl:         'https://rpc.sepolia.org',
+  // Primary RPC. Fallbacks are tried automatically by blockchain.js if this fails.
+  rpcUrl:         'https://sepolia.drpc.org',
+  rpcFallbacks: [
+    'https://ethereum-sepolia-rpc.publicnode.com',
+    'https://sepolia.gateway.tenderly.co',
+    'https://rpc2.sepolia.org',
+    'https://rpc.sepolia.org',
+  ],
   blockExplorer:  'https://sepolia.etherscan.io',
   nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
 

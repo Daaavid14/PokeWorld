@@ -245,6 +245,25 @@ async function loadMyPokemon(userId) {
 }
 
 /* ============================================================
+   PANEL NAVIGATION HELPER
+   Programmatically switch to any dashboard panel — mirrors what
+   the sidebar link clicks do, so post-mint redirects work correctly.
+   ============================================================ */
+
+function navigateToPanel(panelId, userId) {
+  const links  = document.querySelectorAll('.sidebar-link');
+  const panels = document.querySelectorAll('.dash-panel');
+
+  links.forEach(l => l.classList.toggle('active', l.dataset.panel === panelId));
+  panels.forEach(p => p.classList.add('hidden'));
+  document.getElementById(panelId)?.classList.remove('hidden');
+
+  if (panelId === 'my-pokemon')  loadMyPokemon(userId);
+  if (panelId === 'marketplace') { _marketplaceInited = false; initMarketplace(userId); }
+  if (panelId === 'battles')     initBattlePanel(userId);
+}
+
+/* ============================================================
    SIDEBAR NAVIGATION
    ============================================================ */
 
@@ -472,7 +491,30 @@ function initWaitlistButtons(userId) {
    WALLET PANEL
    ============================================================ */
 
+/**
+ * Fetches the real on-chain POKÉ ERC-20 balance for the connected wallet
+ * and updates every balance element in the UI.
+ */
+async function refreshChainBalance(address) {
+  try {
+    if (!address || !window.PokéChain) return;
+    const balance = await window.PokéChain.getPokeBalance(address);
+    const formatted = balance.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const balEl = document.getElementById('tokenBalance');
+    const walEl = document.getElementById('walletBalance');
+    if (balEl) balEl.textContent = formatted;
+    if (walEl) walEl.textContent = `${formatted} POKÉ`;
+  } catch (err) {
+    console.warn('[refreshChainBalance]', err);
+  }
+}
+
 function initWalletPanel() {
+  // Refresh on-chain balance whenever a wallet connects or is restored on page load
+  window.PokéWallet?.on('connected', ({ address }) => refreshChainBalance(address));
+  window.PokéWallet?.on('restored',  ({ address }) => refreshChainBalance(address));
+  window.PokéWallet?.on('accountsChanged', ({ address }) => refreshChainBalance(address));
+
   // Wire up wallet option buttons
   document.querySelectorAll('.wallet-option-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -539,9 +581,84 @@ function initWalletPanel() {
 }
 
 /* ============================================================
-   MARKETPLACE — SHOP (Mint new base Pokémon)
+   BATCH MINT HELPERS
    ============================================================ */
 
+const _batchSelected = new Set(); // species names selected for batch mint
+
+function updateBatchBar() {
+  const bar     = document.getElementById('batchMintBar');
+  const countEl = document.getElementById('batchMintCount');
+  if (!bar) return;
+  if (_batchSelected.size > 0) {
+    bar.classList.remove('hidden');
+    countEl.textContent = `${_batchSelected.size} selected`;
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function clearBatchSelection() {
+  _batchSelected.clear();
+  document.querySelectorAll('#shopGrid .shop-card').forEach(c => c.classList.remove('batch-selected'));
+  updateBatchBar();
+}
+
+async function handleBatchMint(userId) {
+  if (!_batchSelected.size) return;
+
+  const walletState = window.PokéWallet?.getState?.();
+  const inputAddr   = document.getElementById('batchMintAddress')?.value.trim();
+  const toAddress   = (inputAddr && ethers.isAddress(inputAddr)) ? inputAddr : walletState?.address;
+
+  if (!toAddress) { showToast('Enter a valid recipient address.', 'error'); return; }
+
+  const btn = document.getElementById('batchMintBtn');
+  btn.disabled    = true;
+  btn.textContent = 'Minting…';
+
+  const species = [..._batchSelected];
+  let minted = 0, failed = 0;
+
+  for (const s of species) {
+    try {
+      const result = await window.PokéChain.buyFromShop({ buyerAddress: toAddress, species: s });
+
+      await _supabase.from('owned_pokemon').insert({
+        user_id:         userId,
+        species:         s,
+        level:           1,
+        experience:      0,
+        evolution_stage: 'base',
+      });
+
+      btn.textContent = `Minting… ${++minted}/${species.length}`;
+    } catch (err) {
+      console.error(`[Batch Mint] ${s}:`, err);
+      failed++;
+    }
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '⚡ Batch Mint Selected';
+
+  clearBatchSelection();
+
+  const msg = failed
+    ? `⚠️ Minted ${minted}/${species.length}. ${failed} failed — check console.`
+    : `✅ All ${minted} Pokémon minted successfully!`;
+  showToast(msg, failed ? 'warning' : 'success', 6000);
+
+  if (minted > 0) {
+    const countEl = document.getElementById('totalPokemon');
+    if (countEl) countEl.textContent = (parseInt(countEl.textContent) || 0) + minted;
+    setTimeout(() => navigateToPanel('my-pokemon', userId), 800);
+  }
+}
+
+/* ============================================================
+   RENDER SHOP GRID
+   ============================================================ */
 function renderShopGrid(userId) {
   const grid   = document.getElementById('shopGrid');
   const search = (document.getElementById('shopSearch')?.value  || '').toLowerCase();
@@ -577,6 +694,7 @@ function renderShopGrid(userId) {
     card.dataset.type    = pkm.type;
     card.dataset.rarity  = pkm.rarity;
     card.innerHTML = `
+      ${ _isAdminWallet ? `<input type="checkbox" class="batch-checkbox" title="Select for batch mint" />` : '' }
       <span class="card-rarity ${rarityClass[pkm.rarity] || 'rarity-common'}">${pkm.rarity}</span>
       <img src="${gif}" alt="${pkm.species}" class="card-img" loading="lazy" />
       <div class="card-name">${pkm.species}</div>
@@ -587,6 +705,22 @@ function renderShopGrid(userId) {
       <button class="btn btn-primary btn-sm shop-buy-btn"
               data-species="${pkm.species}">Mint Now</button>
     `;
+
+    // Batch-select toggle (admin only)
+    if (_isAdminWallet) {
+      const cb = card.querySelector('.batch-checkbox');
+      cb.addEventListener('change', () => {
+        if (cb.checked) {
+          _batchSelected.add(pkm.species);
+          card.classList.add('batch-selected');
+        } else {
+          _batchSelected.delete(pkm.species);
+          card.classList.remove('batch-selected');
+        }
+        updateBatchBar();
+      });
+    }
+
     grid.appendChild(card);
   }
 
@@ -614,16 +748,32 @@ async function handleShopMint({ userId, species, btn }) {
       species,
     });
 
-    // Record in Supabase
-    await _supabase.from('owned_pokemon').insert([{
-      user_id:         userId,
-      pokemon_id:      null,        // on-chain tokenId stored separately if needed
-      species:         species,
-      nickname:        null,
-      level:           1,
-      experience:      0,
-      evolution_stage: 'base',
-    }]);
+    // Record in Supabase.
+    // Try full insert first; if columns from later migrations are missing
+    // (evolution_stage, experience) fall back to the original bare columns.
+    let insertErr = null;
+
+    ({ error: insertErr } = await _supabase
+      .from('owned_pokemon')
+      .insert({
+        user_id:         userId,
+        species:         species,
+        level:           1,
+        experience:      0,
+        evolution_stage: 'base',
+        // pokemon_id intentionally omitted — column is nullable for shop mints
+      }));
+
+    if (insertErr) {
+      console.error('[Shop Mint] Supabase insert failed:', insertErr);
+      showToast(
+        `⚠️ ${species} minted on-chain (tx: ${result.txHash?.slice(0,10)}…) but failed to save in-game. ` +
+        `Error: ${insertErr.message}`,
+        'error', 10000
+      );
+      setTimeout(() => navigateToPanel('my-pokemon', userId), 1500);
+      return;
+    }
 
     // Deduct POKÉ from in-game balance
     const { data: trainer } = await _supabase
@@ -643,7 +793,14 @@ async function handleShopMint({ userId, species, btn }) {
       document.getElementById('walletBalance').textContent = `${newBal.toLocaleString()} POKÉ`;
     }
 
-    showToast(`✅ ${species} minted! Tx: ${result.txHash?.slice(0,10)}…`, 'success', 6000);
+    // Update overview Pokémon count
+    const countEl = document.getElementById('totalPokemon');
+    if (countEl) countEl.textContent = (parseInt(countEl.textContent) || 0) + 1;
+
+    showToast(`✅ ${species} minted! Redirecting to My Pokémon…`, 'success', 4000);
+
+    // Navigate to My Pokémon so user sees their new NFT immediately
+    setTimeout(() => navigateToPanel('my-pokemon', userId), 800);
   } catch (err) {
     console.error('[Shop Mint]', err);
     showToast(err.message || 'Mint failed. Make sure your wallet is on Sepolia.', 'error', 6000);
@@ -666,17 +823,16 @@ async function handlePackBuy(userId) {
   try {
     const results = await window.PokéChain.buyRandomPack(walletState.address);
 
-    // Record each in Supabase
-    for (const pkm of results) {
-      await _supabase.from('owned_pokemon').insert([{
-        user_id:         userId,
-        species:         pkm.species,
-        nickname:        null,
-        level:           1,
-        experience:      0,
-        evolution_stage: 'base',
-      }]);
-    }
+    // Record all Pokémon in Supabase in one batch insert
+    const insertRows = results.map(pkm => ({
+      user_id:         userId,
+      species:         pkm.species,
+      level:           1,
+      experience:      0,
+      evolution_stage: 'base',
+    }));
+    const { error: insertErr } = await _supabase.from('owned_pokemon').insert(insertRows);
+    if (insertErr) console.error('[Pack] Supabase insert failed:', insertErr);
 
     // Deduct pack price
     const { data: trainer } = await _supabase
@@ -688,8 +844,15 @@ async function handlePackBuy(userId) {
       document.getElementById('tokenBalance').textContent = newBal.toLocaleString();
     }
 
+    // Update overview Pokémon count
+    const countEl = document.getElementById('totalPokemon');
+    if (countEl) countEl.textContent = (parseInt(countEl.textContent) || 0) + results.length;
+
     const names = results.map(r => r.species).join(', ');
-    showToast(`🎁 Pack opened! You got: ${names}`, 'success', 7000);
+    showToast(`🎁 Pack opened! You got: ${names} — redirecting to My Pokémon…`, 'success', 5000);
+
+    // Navigate to My Pokémon so user sees their new NFTs immediately
+    setTimeout(() => navigateToPanel('my-pokemon', userId), 800);
   } catch (err) {
     console.error('[Pack]', err);
     showToast(err.message || 'Pack purchase failed.', 'error', 6000);
@@ -703,21 +866,44 @@ async function handlePackBuy(userId) {
    ============================================================ */
 
 let _marketplaceInited = false;
+let _isAdminWallet     = false;
 
 async function initMarketplace(userId) {
   if (_marketplaceInited) return;
   _marketplaceInited = true;
 
-  // Render shop immediately on first load
-  renderShopGrid(userId);
+  // Detect admin (minter wallet) — drives tab visibility
+  _isAdminWallet = await window.PokéChain?.isConnectedWalletMinter?.() ?? false;
 
-  // Shop filters
+  // Show / hide admin-only tabs
+  document.querySelectorAll('#marketplace .battle-tab[data-admin-only]').forEach(tab => {
+    tab.style.display = _isAdminWallet ? '' : 'none';
+  });
+
+  // Set correct default active tab: Shop for admin, Buy P2P for regular users
+  document.querySelectorAll('#marketplace .battle-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.market-pane').forEach(p => p.classList.add('hidden'));
+
+  if (_isAdminWallet) {
+    document.querySelector('#marketplace .battle-tab[data-tab="shop"]')?.classList.add('active');
+    document.getElementById('marketTab-shop')?.classList.remove('hidden');
+    renderShopGrid(userId);
+  } else {
+    document.querySelector('#marketplace .battle-tab[data-tab="buy"]')?.classList.add('active');
+    document.getElementById('marketTab-buy')?.classList.remove('hidden');
+  }
+
+  // Shop filters (admin only)
   document.getElementById('shopSearch')?.addEventListener('input',  () => renderShopGrid(userId));
   document.getElementById('shopTypeFilter')?.addEventListener('change', () => renderShopGrid(userId));
   document.getElementById('shopRarityFilter')?.addEventListener('change', () => renderShopGrid(userId));
 
   // Pack buy button
   document.getElementById('buyPackBtn')?.addEventListener('click', () => handlePackBuy(userId));
+
+  // Batch mint buttons
+  document.getElementById('batchMintBtn')?.addEventListener('click', () => handleBatchMint(userId));
+  document.getElementById('batchClearBtn')?.addEventListener('click', () => clearBatchSelection());
 
   // Tab switching
   document.querySelectorAll('#marketplace .battle-tab').forEach(tab => {
@@ -863,13 +1049,13 @@ async function loadSellPicker(userId) {
       userId, onEvolved: null,
     });
     card.style.cursor = 'pointer';
-    card.addEventListener('click', () => selectForSale(row, card));
+    card.addEventListener('click', () => selectForSale(row, card, userId));
     picker.appendChild(card);
   }
 }
 
 let _selectedForSale = null;
-function selectForSale(row, cardEl) {
+function selectForSale(row, cardEl, userId) {
   document.querySelectorAll('#sellPicker .nft-card').forEach(c => c.classList.remove('selected-for-sale'));
   cardEl.classList.add('selected-for-sale');
   _selectedForSale = row;
@@ -886,11 +1072,22 @@ function selectForSale(row, cardEl) {
     `;
   }
 
-  document.getElementById('confirmListBtn')?.addEventListener('click', async () => {
+  // Clone buttons to remove any previously attached listeners before re-adding
+  const confirmBtn = document.getElementById('confirmListBtn');
+  const cancelBtn  = document.getElementById('cancelSellBtn');
+  const freshConfirm = confirmBtn?.cloneNode(true);
+  const freshCancel  = cancelBtn?.cloneNode(true);
+  confirmBtn?.parentNode?.replaceChild(freshConfirm, confirmBtn);
+  cancelBtn?.parentNode?.replaceChild(freshCancel,  cancelBtn);
+
+  freshConfirm?.addEventListener('click', async () => {
     if (!_selectedForSale) return;
     const price    = parseInt(document.getElementById('sellPrice')?.value);
     const duration = parseInt(document.getElementById('sellDuration')?.value);
     if (!price || price < 1) { showToast('Enter a valid price.', 'error'); return; }
+
+    freshConfirm.disabled = true;
+    freshConfirm.textContent = 'Listing…';
 
     const expiresAt = new Date(Date.now() + duration * 86400000).toISOString();
     const { error } = await _supabase.from('market_listings').insert([{
@@ -901,17 +1098,27 @@ function selectForSale(row, cardEl) {
       expires_at: expiresAt,
     }]);
 
+    freshConfirm.disabled = false;
+    freshConfirm.textContent = '🏷️ List for Sale';
+
     if (error) { showToast('Failed to list: ' + error.message, 'error'); return; }
     showToast(`${_selectedForSale.species || 'Pokémon'} listed for ${price} POKÉ! 🛒`, 'success');
     form?.classList.add('hidden');
-    delete document.getElementById('sellPicker').dataset.loaded;
-  }, { once: true });
+    _selectedForSale = null;
+    // Reload sell picker so the listed Pokémon disappears from the list
+    const picker = document.getElementById('sellPicker');
+    if (picker) {
+      delete picker.dataset.loaded;
+      picker.innerHTML = '<div class="empty-state"><p>Loading your Pokémon...</p></div>';
+    }
+    await loadSellPicker(userId);
+  });
 
-  document.getElementById('cancelSellBtn')?.addEventListener('click', () => {
+  freshCancel?.addEventListener('click', () => {
     form?.classList.add('hidden');
     _selectedForSale = null;
     cardEl.classList.remove('selected-for-sale');
-  }, { once: true });
+  });
 }
 
 function openBuyModal(listingId, species, nickname, price, userId) {
@@ -1378,6 +1585,12 @@ function showToast(message, type = 'info', duration = 4000) {
   initDeleteAccount(userId);
   initWaitlistButtons(userId);
   initWalletPanel();
+
+  // The 'restored' wallet event fires before initWalletPanel() registers
+  // its listener (wallet.js boots before dashboard.js init runs).
+  // Do a direct check here so the on-chain balance is shown immediately.
+  const _ws = window.PokéWallet?.getState?.();
+  if (_ws?.address) refreshChainBalance(_ws.address);
 
   // Logout buttons on dashboard
   ['dashLogoutBtn'].forEach(id => {

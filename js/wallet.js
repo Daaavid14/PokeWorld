@@ -324,6 +324,41 @@
         _state.address    = saved.address;
         _state.chainId    = saved.chainId;
         _state.walletType = saved.walletType;
+
+        // Re-attach the live provider object so write calls (mint, approve, etc.)
+        // work after a page refresh. The provider cannot be serialised to
+        // localStorage, so we detect it again here.
+        const injectedTypes = ['metamask', 'coinbase', 'brave', 'rabby', 'injected'];
+        if (injectedTypes.includes(saved.walletType)) {
+          const list  = detectInjected() || [];
+          const match = list.find(p => p.type === saved.walletType) || list[0];
+          if (match?.provider) {
+            _state.provider = match.provider;
+            // Re-attach EIP-1193 event listeners
+            match.provider.on?.('accountsChanged', (newAccounts) => {
+              if (!newAccounts.length) { disconnect(); }
+              else {
+                _state.address = newAccounts[0];
+                persistState();
+                emit('accountsChanged', { address: newAccounts[0] });
+                updateWalletUI();
+              }
+            });
+            match.provider.on?.('chainChanged', (newChainHex) => {
+              _state.chainId = parseInt(newChainHex, 16);
+              persistState();
+              emit('chainChanged', { chainId: _state.chainId });
+              updateWalletUI();
+            });
+            match.provider.on?.('disconnect', () => { disconnect(); });
+          }
+        } else if (saved.walletType === 'trust') {
+          const trust = window.trustwallet || window.ethereum;
+          if (trust) _state.provider = trust;
+        } else if (saved.walletType === 'phantom') {
+          if (window.phantom?.ethereum) _state.provider = window.phantom.ethereum;
+        }
+
         emit('restored', { ..._state });
         updateWalletUI();
       }

@@ -33,7 +33,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org;"
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com 'sha256-vvt4KWuNr51XfE5m+hzeNEGh1OfZeG97ccFqGsPwvE='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://assets.pokemon.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://cdn.jsdelivr.net https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org https://rpc.sepolia.org https://rpc2.sepolia.org https://sepolia.drpc.org https://ethereum-sepolia-rpc.publicnode.com https://sepolia.gateway.tenderly.co;"
         }
       ]
     },

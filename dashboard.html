@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com https://pokeapi.co https://upload.wikimedia.org https://avatars.githubusercontent.com https://brave.com https://phantom.app; connect-src 'self' https://*.supabase.co wss://*.walletconnect.org wss://*.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org;" />
+  <!-- CSP is enforced server-side via vercel.json for production.
+       The meta tag is intentionally omitted here so that wallet extensions
+       (MetaMask, Rabby, etc.) can inject their lockdown scripts without
+       being blocked during development and on Vercel. -->
   <title>Dashboard | PokéWorld</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet" />
-  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
+  <link rel="icon" href="/assets/pokeball.svg" type="image/x-icon" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/dashboard.css" />
@@ -254,14 +257,22 @@
 
         <!-- Market tabs -->
         <div class="battle-tabs" role="tablist">
-          <button class="battle-tab active" data-tab="shop">🏪 Shop</button>
-          <button class="battle-tab" data-tab="buy">🛒 Buy P2P</button>
-          <button class="battle-tab" data-tab="sell">📦 Sell / List</button>
+          <button class="battle-tab" data-tab="shop" data-admin-only="true">🏪 Shop</button>
+          <button class="battle-tab active" data-tab="buy">🛒 Buy P2P</button>
+          <button class="battle-tab" data-tab="sell" data-admin-only="true">📦 Sell / List</button>
           <button class="battle-tab" data-tab="my-listings">📋 My Listings</button>
         </div>
 
-        <!-- SHOP tab — mint new base Pokémon -->
-        <div class="market-pane" id="marketTab-shop">
+        <!-- SHOP tab — mint new base Pokémon (admin only) -->
+        <div class="market-pane hidden" id="marketTab-shop">
+          <!-- Batch mint bar (shown when cards are selected) -->
+          <div class="batch-mint-bar hidden" id="batchMintBar">
+            <span id="batchMintCount">0 selected</span>
+            <input type="text" id="batchMintAddress" class="search-input"
+                   placeholder="Recipient address (leave blank = your wallet)" />
+            <button class="btn btn-primary btn-sm" id="batchMintBtn">⚡ Batch Mint Selected</button>
+            <button class="btn btn-ghost btn-sm" id="batchClearBtn">Clear</button>
+          </div>
           <div class="shop-header">
             <p class="sell-hint">Mint new base Pokémon NFTs directly to your wallet. Prices are in POKÉ tokens.</p>
             <div class="shop-pack-banner">

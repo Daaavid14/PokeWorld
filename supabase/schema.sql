@@ -59,7 +59,7 @@ CREATE TRIGGER trainer_profiles_updated_at
 CREATE TABLE IF NOT EXISTS public.owned_pokemon (
   id              UUID        DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  pokemon_id      INTEGER     CHECK (pokemon_id BETWEEN 1 AND 898),
+  pokemon_id      INTEGER     NULL CHECK (pokemon_id BETWEEN 1 AND 898),  -- nullable: shop mints don't have a pokedex id
   nickname        TEXT        CHECK (char_length(nickname) <= 30),
   level           INTEGER     NOT NULL DEFAULT 1 CHECK (level BETWEEN 1 AND 100),
   acquired_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -67,10 +67,11 @@ CREATE TABLE IF NOT EXISTS public.owned_pokemon (
 
 -- Add columns introduced after initial deploy (safe to re-run)
 ALTER TABLE public.owned_pokemon
-  ADD COLUMN IF NOT EXISTS species         TEXT    NOT NULL DEFAULT 'Bulbasaur',
-  ADD COLUMN IF NOT EXISTS evolution_stage TEXT    NOT NULL DEFAULT 'base',
-  ADD COLUMN IF NOT EXISTS experience      INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS listing_id      UUID;
+  ADD COLUMN IF NOT EXISTS species             TEXT    NOT NULL DEFAULT 'Bulbasaur',
+  ADD COLUMN IF NOT EXISTS evolution_stage     TEXT    NOT NULL DEFAULT 'base',
+  ADD COLUMN IF NOT EXISTS experience          INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS listing_id          UUID,
+  ADD COLUMN IF NOT EXISTS on_chain_token_id   TEXT;   -- ERC-721 tokenId from the mint tx
 
 DO $$ BEGIN
   IF NOT EXISTS (

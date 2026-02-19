@@ -95,14 +95,72 @@
   /* ============================================================
      PROVIDER HELPERS
      ============================================================ */
+
+  /** Cache the last confirmed-working RPC URL to avoid retrying on every call */
+  let _cachedRpcUrl = null;
+
+  /**
+   * Returns a JsonRpcProvider backed by the first reachable Sepolia RPC.
+   * Tries the primary URL, then each fallback in order.
+   * Result is cached so subsequent calls are instant.
+   */
+  async function _readProviderAsync() {
+    if (_cachedRpcUrl) {
+      return new ethers.JsonRpcProvider(_cachedRpcUrl);
+    }
+
+    const cfg = window.CHAIN_CONFIG;
+    const urls = [cfg.rpcUrl, ...(cfg.rpcFallbacks || [])];
+
+    for (const url of urls) {
+      try {
+        const p = new ethers.JsonRpcProvider(url);
+        // Quick liveness check — getBlockNumber is lightweight
+        await p.getBlockNumber();
+        _cachedRpcUrl = url;
+        console.log('[PokéChain] Using RPC:', url);
+        return p;
+      } catch {
+        console.warn('[PokéChain] RPC unreachable, trying next:', url);
+      }
+    }
+
+    // All RPCs failed — throw a clear error
+    throw new Error(
+      'All Sepolia RPC endpoints are unreachable. ' +
+      'Check your internet connection or try again later.'
+    );
+  }
+
+  /**
+   * Synchronous read-provider used for contract instantiation.
+   * Falls back to window.ethereum (MetaMask) for read calls when possible,
+   * since the wallet is already connected and avoids the RPC round-trip.
+   */
   function _readProvider() {
-    return new ethers.JsonRpcProvider(window.CHAIN_CONFIG.rpcUrl);
+    // If a wallet is connected, its embedded provider can handle reads too
+    const walletState = window.PokéWallet?.getState?.();
+    if (walletState?.provider) {
+      return new ethers.BrowserProvider(walletState.provider);
+    }
+    // Use cached url or primary as best-effort synchronous fallback
+    const url = _cachedRpcUrl || window.CHAIN_CONFIG.rpcUrl;
+    return new ethers.JsonRpcProvider(url);
   }
 
   function _writeProvider() {
     const walletState = window.PokéWallet?.getState?.();
-    if (!walletState?.provider) throw new Error('No wallet connected');
-    return new ethers.BrowserProvider(walletState.provider);
+    // Primary: use the stored provider
+    if (walletState?.provider) {
+      return new ethers.BrowserProvider(walletState.provider);
+    }
+    // Fallback: if state has an address but lost the provider reference
+    // (e.g. page refresh before restoreState ran), try window.ethereum
+    if (walletState?.address && window.ethereum) {
+      console.warn('[PokéChain] Provider missing from state — falling back to window.ethereum');
+      return new ethers.BrowserProvider(window.ethereum);
+    }
+    throw new Error('No wallet connected');
   }
 
   function _nftRead()  { return new ethers.Contract(window.CHAIN_CONFIG.contracts.PokeWorldNFT,    NFT_ABI,         _readProvider()); }
@@ -150,10 +208,12 @@
      ============================================================ */
   async function getPokeBalance(address) {
     try {
-      const token = _tokenRead();
+      const provider = await _readProviderAsync();
+      const token = new ethers.Contract(window.CHAIN_CONFIG.contracts.PokeToken, TOKEN_ABI, provider);
       const raw = await token.balanceOf(address);
       return Number(ethers.formatUnits(raw, 18));
-    } catch {
+    } catch (err) {
+      console.warn('[getPokeBalance]', err.message);
       return 0;
     }
   }
@@ -165,7 +225,8 @@
     try {
       const walletState = window.PokéWallet?.getState?.();
       if (!walletState?.address) return false;
-      const nft = _nftRead();
+      const provider = await _readProviderAsync();
+      const nft = new ethers.Contract(window.CHAIN_CONFIG.contracts.PokeWorldNFT, NFT_ABI, provider);
       return await nft.isMinter(walletState.address);
     } catch {
       return false;
