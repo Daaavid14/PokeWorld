@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokéWorld — Battle Arena</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Supabase SDK (must load before config.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+  /* ============================================================
+     GLOBAL RESET & TOKENS
+     ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --font-game: 'Fredoka One', cursive;
+    --font-ui:   'Nunito', sans-serif;
+
+    /* Sky / Arena */
+    --sky-top:     #1a3a6e;
+    --sky-mid:     #2d6aad;
+    --sky-light:   #5b9fd6;
+    --sky-horizon: #a8ceea;
+    --ground-top:  #c49230;
+    --ground-mid:  #8b5a14;
+    --ground-bot:  #3b2000;
+
+    /* UI Wood */
+    --wood-dark:   #3d1f0a;
+    --wood-mid:    #6b3a15;
+    --wood-light:  #a0611e;
+    --wood-edge:   #c4882a;
+    --wood-shine:  #e8b86d;
+
+    /* Battle nameplates */
+    --plate-player:   #c46010;
+    --plate-opponent: #1060c4;
+
+    /* Energy */
+    --energy-fill:  #ff9500;
+    --energy-empty: #5c3d10;
+
+    /* HP */
+    --hp-hi:  #4cd964;
+    --hp-mid: #ffcc00;
+    --hp-lo:  #ff3b30;
+  }
+
+  html, body {
+    width: 100%; height: 100vh;
+    overflow: hidden;
+    font-family: var(--font-ui);
+    background: #1a0d05;
+    color: #fff;
+    user-select: none;
+  }
+
+  /* ============================================================
+     GLOBAL OVERLAYS
+     ============================================================ */
+  #battle-error {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #cc0000;
+    color: #fff;
+    text-align: center;
+    padding: 12px 16px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    z-index: 9999;
+  }
+  #battle-notice {
+    position: fixed;
+    top: 80px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,200,50,0.97);
+    color: #111;
+    padding: 10px 28px;
+    border-radius: 24px;
+    font-weight: 800;
+    font-size: 1rem;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  #battle-notice.visible { opacity: 1; }
+
+  /* ============================================================
+     SCREEN SWITCHER
+     ============================================================ */
+  .screen { display: none; width: 100%; height: 100vh; position: absolute; inset: 0; }
+  .screen.active { display: flex; }
+
+
+
+  /* ============================================================
+     SCREEN 2 — MATCHMAKING
+     ============================================================ */
+  #screen-matchmaking {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(255,200,50,0.08), transparent 60%),
+      linear-gradient(160deg, #1a3a6e 0%, #2d1a08 100%);
+    gap: 32px;
+  }
+  .mm-vs-row { display: flex; align-items: center; gap: 40px; }
+  .mm-trainer-box { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .mm-avatar {
+    width: 96px; height: 96px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.8rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3), inset 0 0 20px rgba(255,255,255,0.04);
+    animation: avatar-float 3s ease-in-out infinite alternate;
+  }
+  @keyframes avatar-float {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-8px); }
+  }
+  .mm-name { font-family: var(--font-game); font-size: 1.1rem; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .mm-vs-badge {
+    font-family: var(--font-game);
+    font-size: 4rem;
+    background: linear-gradient(135deg, #ff8c00, #ff3b88);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 22px rgba(255,100,0,0.6));
+    animation: vs-pulse 1.5s ease-in-out infinite alternate;
+  }
+  @keyframes vs-pulse {
+    0% { filter: drop-shadow(0 0 22px rgba(255,100,0,0.6)); transform: scale(1); }
+    100% { filter: drop-shadow(0 0 35px rgba(255,100,0,0.8)); transform: scale(1.08); }
+  }
+  .mm-finding {
+    font-family: var(--font-game);
+    font-size: 1.3rem;
+    color: #ffe566;
+    animation: mm-pulse 1s ease-in-out infinite alternate;
+    letter-spacing: 2px;
+  }
+  @keyframes mm-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+  .mm-spinner {
+    width: 44px; height: 44px;
+    border: 4px solid rgba(255,229,102,0.2);
+    border-top-color: #ffe566;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============================================================
+     SCREEN 3 — BATTLE ARENA  (full Axie style)
+     ============================================================ */
+  #screen-battle {
+    flex-direction: column;
+    justify-content: space-between; /* HUD top, bottom panel bottom */
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Illustrated background — Axie Infinity scenic arena ── */
+  #battle-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(180deg,
+      #3dc8e8 0%,       /* bright turquoise sky */
+      #56d4f0 12%,
+      #78e0f6 24%,
+      #a0ecfa 36%,
+      #c8f4fc 46%,      /* sky-to-ground transition */
+      #e8dcc0 50%,      /* sandy beige transition */
+      #d4b87a 55%,      /* sandy tan */
+      #c8a862 62%,
+      #b09050 70%,
+      #987840 80%,
+      #806030 90%,
+      #604820 100%       /* dark rocky earth */
+    );
+  }
+  /* Sandy ground texture + rocky elements */
+  #battle-bg::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 52%;
+    background:
+      radial-gradient(ellipse 50% 25% at 15% 65%, rgba(100,70,30,0.25), transparent 60%),
+      radial-gradient(ellipse 40% 20% at 85% 70%, rgba(100,70,30,0.2), transparent 55%),
+      radial-gradient(ellipse 140% 30% at 50% 100%, rgba(60,40,15,0.3), transparent 50%),
+      radial-gradient(ellipse 30% 35% at 8% 80%, rgba(80,60,30,0.35), transparent 60%),
+      radial-gradient(ellipse 30% 35% at 92% 80%, rgba(80,60,30,0.35), transparent 60%);
+    pointer-events: none;
+  }
+  /* Stone pillar decorations (Axie arena elements) */
+  #battle-bg::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 48%;
+    background:
+      radial-gradient(ellipse 6% 40% at 5% 55%, rgba(90,70,40,0.6), transparent 70%),
+      radial-gradient(ellipse 6% 40% at 95% 55%, rgba(90,70,40,0.6), transparent 70%),
+      radial-gradient(ellipse 4% 30% at 12% 60%, rgba(110,85,50,0.4), transparent 65%),
+      radial-gradient(ellipse 4% 30% at 88% 60%, rgba(110,85,50,0.4), transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Top HUD — Axie Infinity style ── */
+  #battle-hud {
+    position: relative; z-index: 20;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    background: linear-gradient(180deg, rgba(50,30,10,0.92), rgba(35,20,5,0.88));
+    border-bottom: 3px solid var(--wood-edge);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  /* Nameplates — Axie wooden banner style */
+  .battle-nameplate {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 18px 6px 12px;
+    border-radius: 8px;
+    font-family: var(--font-game);
+    min-width: 160px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+  }
+  .battle-nameplate::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%);
+    pointer-events: none;
+  }
+  .battle-nameplate.player-plate {
+    background: linear-gradient(135deg, var(--wood-mid), var(--wood-dark));
+    border: 2px solid var(--wood-shine);
+    color: #ffe;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .battle-nameplate.opponent-plate {
+    background: linear-gradient(135deg, #4a2a10, #2a1505);
+    border: 2px solid var(--wood-light);
+    color: #dde;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    flex-direction: row-reverse; text-align: right;
+  }
+  .nameplate-icon { font-size: 1.3rem; }
+  .nameplate-inner { display: flex; flex-direction: column; gap: 1px; }
+  .nameplate-name  { font-size: 0.9rem; }
+  .nameplate-sub   { font-size: 0.6rem; color: rgba(255,255,255,0.6); }
+
+  /* Round center — Axie-style green pill with numbered portraits */
+  #round-counter-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  #round-counter {
+    font-family: var(--font-game);
+    font-size: 1rem;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, #38a838, #2d8a2d);
+    padding: 4px 22px;
+    border-radius: 20px;
+    border: 2px solid #50c050;
+    box-shadow: 0 2px 8px rgba(50,160,50,0.3);
+  }
+  #turn-phase {
+    font-size: 0.68rem; font-weight: 800;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.55);
+    padding: 2px 14px; border-radius: 99px;
+    letter-spacing: 0.5px;
+  }
+  #team-portraits {
+    display: flex; align-items: center; gap: 3px; margin-top: 2px;
+  }
+  .portrait-badge {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.3);
+    overflow: hidden;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.3s;
+    position: relative;
+  }
+  .portrait-badge img { width: 22px; height: 22px; object-fit: contain; image-rendering: auto; }
+  .portrait-badge.fainted { opacity: 0.2; filter: grayscale(1); border-color: #ff3b30; }
+  .portrait-badge.player-side { border-color: #40b0ff; background: rgba(30,80,140,0.6); }
+  .portrait-badge.opponent-side { border-color: #ff6040; background: rgba(140,40,20,0.6); }
+  /* Speed‐order number in portrait */
+  .portrait-order {
+    position: absolute; bottom: -1px; right: -1px;
+    width: 14px; height: 14px;
+    background: rgba(0,0,0,0.75);
+    border-radius: 3px 0 3px 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.45rem; color: #fff;
+  }
+  .portrait-sep { font-size: 0.6rem; color: rgba(255,255,255,0.25); }
+
+  /* Energy display in HUD for opponent */
+  .energy-hud-row { display:flex; align-items:center; gap:4px; }
+  .energy-hud-pips { display:flex; gap:2px; }
+  .energy-hud-pip {
+    width:9px; height:9px; border-radius:50%;
+    background: var(--energy-fill);
+    box-shadow: 0 0 5px rgba(255,149,0,0.55);
+    transition: all 0.2s;
+  }
+  .energy-hud-pip.empty { background: var(--energy-empty); box-shadow: none; }
+  .energy-hud-label { font-size:0.62rem; color:rgba(255,255,255,0.5); font-family: var(--font-game); }
+
+  /* ── Arena: full-screen overlay ── */
+  #battle-arena {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* Player team — left side, facing right toward opponent */
+  #field-player {
+    position: absolute;
+    left: 2%;
+    right: 52%;
+    bottom: 30%;
+    display: flex; flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  /* Opponent team — right side, facing left toward player */
+  #field-opponent {
+    position: absolute;
+    left: 52%;
+    right: 2%;
+    bottom: 30%;
+    display: flex; 
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  /* ── Sprite unit — Axie style, left/right layout ── */
+  .field-unit {
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    position: relative; 
+    cursor: default;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), filter 0.25s, opacity 0.25s;
+  }
+  /* Active front fighter — fully bright with glow */
+  .field-unit.active-unit {
+    transform: scale(1.08);
+    transform-origin: bottom center;
+    opacity: 1;
+    z-index: 3;
+    filter: drop-shadow(0 4px 12px rgba(255,220,50,0.35));
+  }
+  /* Benched — slightly smaller but VISIBLE (Axie shows all 3) */
+  .field-unit.benched-unit {
+    transform: scale(0.78);
+    transform-origin: bottom center;
+    opacity: 0.88;
+    z-index: 2;
+  }
+  .field-unit.fainted-unit {
+    pointer-events: none; z-index: 1;
+    transform: scale(0.55);
+    transform-origin: bottom center;
+    filter: grayscale(1) brightness(0.5);
+    opacity: 0.4;
+  }
+  /* Targeted enemy — red glow */
+  .field-unit.targeted-unit {
+    filter: drop-shadow(0 0 16px rgba(255,60,48,1)) drop-shadow(0 0 6px rgba(255,60,48,0.6));
+    z-index: 4;
+  }
+  /* Active attacker highlight — golden glow */
+  .field-unit.attacking-unit {
+    filter: drop-shadow(0 0 18px rgba(255,220,50,0.95)) drop-shadow(0 0 8px rgba(255,180,0,0.7));
+    z-index: 4;
+  }
+  /* Click cursor for opponents */
+  #field-opponent .field-unit:not(.fainted-unit) { cursor: crosshair; }
+  /* Default GIF sprites face LEFT.
+     Player is on left → flip so they face RIGHT (toward opponent).
+     Opponent is on right → keep as-is so they face LEFT (toward player). */
+  #field-player   .unit-sprite { transform: scaleX(-1); }
+  #field-opponent .unit-sprite { transform: scaleX(1); }
+
+  /* Depth stacking — units closest to center are bigger/in front */
+  #field-player   .field-unit:last-child  { z-index: 4; } /* rightmost = closest to enemy */
+  #field-opponent .field-unit:first-child { z-index: 4; } /* leftmost  = closest to player */
+
+  /* Ground shadow — Axie-style elliptical */
+  .unit-shadow {
+    width: 85%;
+    height: 18px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 68%);
+    border-radius: 50%;
+    margin-top: -6px;
+    flex-shrink: 0;
+    transition: all 0.25s;
+  }
+  .active-unit  .unit-shadow { width: 110%; height: 22px; }
+  .benched-unit .unit-shadow { width: 70%; opacity: 0.65; }
+  .fainted-unit .unit-shadow { opacity: 0; }
+
+  /* Sprite sizes — Axie-large, crisp and prominent */
+  .unit-sprite {
+    width: 160px; height: 160px;
+    object-fit: contain;
+    image-rendering: auto;
+    display: block;
+    flex-shrink: 0;
+  }
+  .active-unit  .unit-sprite { width: 200px; height: 200px; }
+  .benched-unit .unit-sprite { width: 150px; height: 150px; }
+
+  /* HP badge — Axie-style: compact floating badge (type-icon + HP number + thin bar) */
+  .unit-hp-badge {
+    background: rgba(0,0,0,0.65);
+    border-radius: 8px;
+    padding: 3px 10px 5px;
+    min-width: 70px;
+    display: flex; flex-direction: column; gap: 2px;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+  }
+  .hp-badge-top {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .hp-type-icon {
+    font-size: 0.7rem;
+    filter: drop-shadow(0 0 3px var(--type-glow, #888));
+  }
+  .hp-badge-name {
+    font-family: var(--font-game);
+    font-size: 0.62rem;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    letter-spacing: 0.5px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+    text-align: center;
+  }
+  .hp-badge-lv   { display: none; } /* Hidden in Axie style */
+  .hp-num-display {
+    font-family: var(--font-game); font-size: 0.82rem; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    line-height: 1;
+  }
+  .hp-bar-wrap   { width: 100%; height: 5px; background: rgba(255,255,255,0.15); border-radius: 99px; overflow: hidden; }
+  .hp-bar {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--hp-hi), #68e878);
+    transition: width 0.4s, background 0.4s;
+    box-shadow: 0 0 4px rgba(76,217,100,0.4);
+  }
+  .hp-bar.warn { background: linear-gradient(90deg, var(--hp-mid), #ffe044); box-shadow: 0 0 4px rgba(255,204,0,0.4); }
+  .hp-bar.crit { background: linear-gradient(90deg, var(--hp-lo), #ff5540); box-shadow: 0 0 4px rgba(255,59,48,0.4); }
+  .hp-badge-nums { display: none; } /* Hidden — HP shown in badge-top */
+  .hp-num-hp   { color: #4cd964; }
+  .hp-num-max  { color: rgba(255,255,255,0.45); font-size: 0.58rem; }
+  .hp-shield-badge {
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+    font-family: var(--font-game); font-size: 0.55rem; color: #60b8ff;
+    text-shadow: 0 0 4px rgba(96,184,255,0.4);
+  }
+  .hp-status-row { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; }
+  .hp-status-icon { font-size: 0.65rem; }
+
+  /* Type badge — Axie-style colored pill above the sprite */
+  .unit-type-badge {
+    font-family: var(--font-game);
+    font-size: 0.52rem;
+    color: #fff;
+    background: var(--type-glow, #888);
+    border-radius: 6px;
+    padding: 1px 8px;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    letter-spacing: 0.8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    margin-top: 2px;
+    white-space: nowrap;
+  }
+
+  /* Damage pop — with stroke for bright background visibility */
+  .dmg-float {
+    position: absolute; top: 8px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-game);
+    font-size: 1.5rem; color: #ff3b30;
+    pointer-events: none;
+    animation: dmg-rise 1.2s ease-out forwards;
+    z-index: 100;
+    text-shadow: 0 0 12px rgba(255,59,48,0.9), 0 2px 4px rgba(0,0,0,0.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    white-space: nowrap;
+  }
+  .dmg-float.super  { color: #ff9500; font-size: 1.7rem; text-shadow: 0 0 16px rgba(255,149,0,0.9), 0 2px 4px rgba(0,0,0,0.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
+  .dmg-float.immune { color: #ccc; font-size: 1rem; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
+  .dmg-float.heal   { color: var(--hp-hi); }
+  @keyframes dmg-rise {
+    0%   { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+    20%  { opacity:1; transform:translateX(-50%) translateY(-10px) scale(1.25); }
+    70%  { opacity:1; transform:translateX(-50%) translateY(-50px) scale(1.1); }
+    100% { opacity:0; transform:translateX(-50%) translateY(-80px) scale(0.8); }
+  }
+
+  /* ── Bottom panel — Axie-style dark stone ── */
+  #battle-bottom {
+    position: relative;
+    flex-shrink: 0;
+    display: flex; flex-direction: column;
+    z-index: 20;
+    background:
+      linear-gradient(180deg, rgba(40,28,15,0.95) 0%, rgba(25,15,8,0.98) 100%);
+    border-top: 3px solid var(--wood-edge);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+  }
+
+  /* ── Card Queue row — Axie-style, below HUD ── */
+  #card-queue-section {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 16px;
+    background: linear-gradient(180deg, rgba(45,30,12,0.92), rgba(30,18,8,0.88));
+    border-bottom: 2px solid var(--wood-light);
+    min-height: 48px;
+    overflow-x: auto;
+    z-index: 15;
+    position: relative;
+    flex-shrink: 0;
+  }
+  #card-queue-section.has-cards {
+    display: flex;
+  }
+  #card-queue-label {
+    font-family: var(--font-game);
+    font-size: 0.65rem;
+    color: #ffe566;
+    text-shadow: 0 0 8px rgba(255,229,102,0.3);
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  #card-queue {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+  }
+  /* Queued mini-card */
+  .queue-card {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 5px;
+    background: linear-gradient(135deg, rgba(60,40,10,0.9), rgba(30,18,5,0.95));
+    border: 2px solid var(--type-glow, rgba(255,200,50,0.3));
+    border-radius: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    animation: queue-in 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes queue-in {
+    0%   { transform: translateY(20px) scale(0.7); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .queue-card:hover {
+    background: rgba(255,60,48,0.15);
+    border-color: #ff3b30;
+    transform: scale(1.05);
+  }
+  .queue-card-num {
+    position: absolute; top: -6px; left: -6px;
+    width: 18px; height: 18px;
+    background: linear-gradient(135deg, #ffe566, #ff9500);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.55rem; color: #1a0d05;
+    font-weight: 900;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .queue-card img {
+    width: 28px; height: 28px;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+  .queue-card-info {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .queue-card-name {
+    font-family: var(--font-game); font-size: 0.58rem; color: #fff;
+    max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .queue-card-owner {
+    font-size: 0.48rem; color: rgba(255,255,255,0.45); font-family: var(--font-game);
+  }
+  .queue-card-energy {
+    font-family: var(--font-game); font-size: 0.6rem; color: #ff9500;
+    text-shadow: 0 0 5px rgba(255,149,0,0.4);
+  }
+  #queue-energy-cost {
+    font-family: var(--font-game); font-size: 0.65rem;
+    color: #ff9500;
+    white-space: nowrap;
+    text-shadow: 0 0 6px rgba(255,149,0,0.3);
+  }
+
+  /* Combo row — compact Axie-style */
+  #combo-section {
+    display: flex; align-items: center; gap: 10px;
+    padding: 2px 14px;
+    border-bottom: 1px solid rgba(255,200,50,0.08);
+    min-height: 20px;
+  }
+  #combo-hud {
+    flex: 1; max-width: 180px;
+    height: 12px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 99px;
+    position: relative; overflow: hidden;
+    border: 1px solid rgba(255,200,50,0.2);
+  }
+  .combo-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff8c00, #ff3b88);
+    border-radius: 99px; transition: width 0.3s;
+  }
+  .combo-label {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.62rem; color: #fff;
+    text-shadow: 0 0 4px #000;
+  }
+  .combo-hint { font-size: 0.65rem; color: rgba(255,255,255,0.38); }
+
+  /* Cards + energy + end-turn row — Axie layout */
+  #cards-actions-row {
+    display: flex; align-items: center; gap: 0;
+    padding: 4px 12px 8px;
+  }
+
+  /* Energy orb — Axie-style big circular with card count */
+  #energy-orb {
+    flex-shrink: 0; width: 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    margin-right: 10px;
+  }
+  .energy-main-badge {
+    width: 62px; height: 62px;
+    background: radial-gradient(circle at 35% 30%, #ffd050, var(--energy-fill), #aa4800);
+    border-radius: 50%;
+    border: 3px solid var(--wood-shine);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 0 22px rgba(255,149,0,0.5), 0 0 44px rgba(255,149,0,0.15), inset 0 -5px 8px rgba(0,0,0,0.35);
+    font-family: var(--font-game); color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    animation: energy-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes energy-pulse {
+    0%,100% { box-shadow: 0 0 20px rgba(255,149,0,0.5), 0 0 40px rgba(255,149,0,0.2), inset 0 -4px 6px rgba(0,0,0,0.35); }
+    50% { box-shadow: 0 0 28px rgba(255,149,0,0.65), 0 0 55px rgba(255,149,0,0.3), inset 0 -4px 6px rgba(0,0,0,0.35); }
+  }
+  .energy-num { font-size: 1.35rem; line-height: 1; }
+  .energy-den { font-size: 0.52rem; color: rgba(255,255,255,0.75); }
+  .energy-label { font-size: 0.6rem; color: rgba(255,255,255,0.45); font-family: var(--font-game); }
+  #energy-pips { display: flex; gap: 3px; flex-wrap: wrap; max-width: 70px; justify-content: center; }
+  .energy-pip {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--energy-fill);
+    box-shadow: 0 0 5px rgba(255,149,0,0.5);
+    transition: all 0.2s;
+  }
+  .energy-pip.empty { background: var(--energy-empty); box-shadow: none; }
+
+  /* Skill cards — Axie Infinity card design */
+  #skill-hand-section { display: none; }
+  #skill-hand {
+    flex: 1;
+    display: flex; align-items: flex-end; gap: 6px;
+    overflow-x: auto; padding: 2px 4px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,200,50,0.3) transparent;
+  }
+  /* Card group wrapper per Pokémon */
+  .card-group {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    flex-shrink: 0;
+  }
+  .card-group-header {
+    display: flex; align-items: center; gap: 4px;
+    padding: 1px 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .card-group-header img {
+    width: 18px; height: 18px;
+    object-fit: contain;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.3);
+  }
+  .card-group-header span {
+    font-family: var(--font-game); font-size: 0.55rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .card-group-cards {
+    display: flex; align-items: flex-end; gap: 5px;
+  }
+  /* Divider between groups */
+  .card-group-divider {
+    width: 1px;
+    height: 110px;
+    background: linear-gradient(180deg, transparent, rgba(255,200,50,0.15), rgba(255,200,50,0.25), rgba(255,200,50,0.15), transparent);
+    flex-shrink: 0;
+    margin: 0 2px;
+    align-self: center;
+  }
+  .skill-card {
+    flex-shrink: 0;
+    width: 100px; height: 148px;
+    border-radius: 12px;
+    background: linear-gradient(160deg, #3a2210, #1c0e04);
+    border: 2.5px solid var(--type-glow, #888);
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .skill-card:hover:not(.sc-disabled) {
+    transform: translateY(-18px) scale(1.08);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 24px var(--type-glow, rgba(255,255,255,0.2));
+    z-index: 5;
+  }
+  .skill-card:active:not(.sc-disabled) { transform: translateY(-8px) scale(1.03); }
+  .skill-card.sc-disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(0.5); }
+
+  /* ── Axie Card Selection Highlight ── */
+  .skill-card.card-selected {
+    transform: translateY(-22px) scale(1.06);
+    box-shadow: 0 22px 40px rgba(0,0,0,0.55), 0 0 30px var(--type-glow, rgba(255,229,102,0.5));
+    border-color: #ffe566;
+    z-index: 6;
+    filter: brightness(1.2);
+  }
+  .skill-card.card-selected::before {
+    content: '';
+    position: absolute; inset: -3px;
+    border-radius: 14px;
+    border: 2px solid rgba(255,229,102,0.5);
+    animation: selected-pulse 1.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes selected-pulse {
+    0%,100% { opacity: 0.4; }
+    50%     { opacity: 1; }
+  }
+  .card-queue-badge {
+    position: absolute; top: -8px; right: -8px;
+    width: 22px; height: 22px;
+    background: linear-gradient(135deg, #ffe566, #ff9500);
+    border-radius: 50%; border: 2px solid #1a0d05;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.65rem; color: #1a0d05;
+    font-weight: 900; z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  /* ── Combo Badge on Card Group Header ── */
+  .combo-badge {
+    font-family: var(--font-game);
+    font-size: 0.55rem;
+    color: #ff8c00;
+    background: rgba(255,140,0,0.15);
+    border: 1px solid rgba(255,140,0,0.3);
+    border-radius: 6px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    animation: combo-glow 1s ease-in-out infinite alternate;
+  }
+  @keyframes combo-glow {
+    0%   { text-shadow: 0 0 4px rgba(255,140,0,0.3); }
+    100% { text-shadow: 0 0 12px rgba(255,140,0,0.7); }
+  }
+
+  /* ── Stat mini badges on field units ── */
+  .stat-mini-row {
+    display: flex; gap: 4px; justify-content: center;
+    margin-top: 2px;
+  }
+  .stat-mini {
+    font-family: var(--font-game);
+    font-size: 0.48rem;
+    color: rgba(255,255,255,0.6);
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    padding: 0 3px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Last Stand Unit Visual ── */
+  .last-stand-unit {
+    position: relative;
+  }
+  .last-stand-unit::after {
+    content: '';
+    position: absolute; inset: -6px;
+    border-radius: 16px;
+    border: 2px solid rgba(180,100,255,0.5);
+    box-shadow: 0 0 20px rgba(180,100,255,0.35), inset 0 0 15px rgba(180,100,255,0.15);
+    animation: last-stand-aura 1.5s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes last-stand-aura {
+    0%   { box-shadow: 0 0 15px rgba(180,100,255,0.3), inset 0 0 10px rgba(180,100,255,0.1); }
+    100% { box-shadow: 0 0 30px rgba(180,100,255,0.55), inset 0 0 20px rgba(180,100,255,0.25); }
+  }
+  .last-stand-badge {
+    font-family: var(--font-game);
+    font-size: 0.52rem;
+    color: #cc88ff;
+    background: rgba(120,60,200,0.25);
+    border: 1px solid rgba(180,100,255,0.3);
+    border-radius: 6px;
+    padding: 1px 6px;
+    text-align: center;
+    margin-top: 2px;
+    animation: last-stand-aura 1.5s ease-in-out infinite alternate;
+  }
+  .hp-bar.last-stand {
+    background: linear-gradient(90deg, #cc88ff, #9955dd) !important;
+  }
+
+  /* ── Last Stand portrait ── */
+  .last-stand-portrait {
+    border-color: #cc88ff !important;
+    box-shadow: 0 0 8px rgba(180,100,255,0.4);
+  }
+
+  /* ── Portrait speed order badge ── */
+  .portrait-order {
+    position: absolute; bottom: -4px; right: -4px;
+    width: 14px; height: 14px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.42rem; color: #fff;
+  }
+
+  /* ── Attacking unit flash ── */
+  .attacking-unit .unit-sprite {
+    animation: attack-flash 0.7s ease-out;
+  }
+  @keyframes attack-flash {
+    0%   { filter: brightness(1); transform: translateX(0); }
+    20%  { filter: brightness(1.6); transform: translateX(10px); }
+    50%  { filter: brightness(1.3); transform: translateX(-5px); }
+    100% { filter: brightness(1); transform: translateX(0); }
+  }
+
+  /* ── Crit damage popup ── */
+  .dmg-float.crit-hit {
+    color: #ff3b30 !important;
+    font-size: 1.2em;
+    text-shadow: 0 0 16px rgba(255,59,48,0.8), 0 2px 4px rgba(0,0,0,0.8);
+    animation: dmg-float 1.2s ease-out forwards, crit-shake 0.3s ease-out;
+  }
+  @keyframes crit-shake {
+    0%,100% { transform: translateX(0); }
+    25%     { transform: translateX(-5px); }
+    75%     { transform: translateX(5px); }
+  }
+
+  /* ── Last Stand / Crit banner animations ── */
+  .last-stand-banner-anim {
+    color: #cc88ff !important;
+    text-shadow: 0 0 38px rgba(180,100,255,0.75), 0 4px 8px rgba(0,0,0,0.8) !important;
+  }
+  .crit-banner-anim {
+    color: #ff3b30 !important;
+    text-shadow: 0 0 38px rgba(255,59,48,0.75), 0 4px 8px rgba(0,0,0,0.8) !important;
+  }
+
+  .skill-card.sc-flash { animation: card-use-flash 0.35s ease-out; }
+  @keyframes card-use-flash {
+    0%   { box-shadow: 0 0 0 rgba(255,229,102,0); }
+    40%  { box-shadow: 0 0 28px 7px rgba(255,229,102,0.75); transform: translateY(-18px) scale(1.1); }
+    100% { box-shadow: 0 0 0 rgba(255,229,102,0); }
+  }
+  .sc-type-bar { height: 4px; width: 100%; background: var(--type-glow, #888); flex-shrink: 0; }
+  .sc-energy {
+    position: absolute; top: 6px; left: 6px;
+    width: 22px; height: 22px;
+    background: radial-gradient(circle, #ffb830, #ff6600);
+    border-radius: 50%; border: 2px solid rgba(255,255,255,0.45);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-game); font-size: 0.75rem; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    box-shadow: 0 2px 6px rgba(200,80,0,0.5); z-index: 2;
+  }
+  .sc-art {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 4px; min-height: 0;
+  }
+  .sc-art-gif { width: 48px; height: 48px; object-fit: contain; image-rendering: auto; }
+  .sc-art-icon { font-size: 1.9rem; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.55)); }
+  .sc-name { font-family: var(--font-game); font-size: 0.68rem; color: #fff; text-align: center; padding: 0 5px; line-height: 1.2; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+  .sc-type-label { font-size: 0.56rem; font-weight: 900; text-align: center; text-transform: uppercase; color: var(--type-glow, #aaa); padding: 2px 0 3px; letter-spacing: 0.5px; }
+  .sc-stats-row {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 4px 6px 5px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+  }
+  .sc-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .sc-stat-val { font-family: var(--font-game); font-size: 0.82rem; color: #fff; line-height: 1; }
+  .sc-stat-lbl { font-size: 0.48rem; color: rgba(255,255,255,0.45); }
+
+  /* End Turn — Axie orange button with crossed swords */
+  #end-turn-wrap {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 0 8px 0 12px; margin-left: 6px;
+  }
+  #btn-end-turn {
+    font-family: var(--font-game); font-size: 0.95rem;
+    background: linear-gradient(135deg, #e8a020, #c45500);
+    color: #fff; border: none;
+    padding: 14px 24px; border-radius: 14px;
+    cursor: pointer; letter-spacing: 0.5px;
+    box-shadow: 0 5px 0 #7a2d00, 0 8px 20px rgba(0,0,0,0.5);
+    transition: all 0.15s; white-space: nowrap;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5); min-width: 120px;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--wood-shine);
+  }
+  #btn-end-turn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  #btn-end-turn:hover:not(:disabled) { transform: translateY(2px); box-shadow: 0 3px 0 #7a2d00, 0 5px 12px rgba(0,0,0,0.4); }
+  #btn-end-turn:disabled { background: linear-gradient(135deg, #555, #333); box-shadow: 0 4px 0 #1a1a1a; cursor: not-allowed; color: #777; }
+  .hint-txt { font-size: 0.62rem; color: rgba(255,255,255,0.55); text-align: center; max-width: 130px; font-weight: 700; }
+
+  /* ── Overlays ── */
+  #combo-burst-banner {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%) scale(0.5);
+    z-index: 200; pointer-events: none; opacity: 0;
+    transition: opacity 0.1s, transform 0.15s;
+    font-family: var(--font-game); font-size: 2.4rem; color: #fff;
+    background: linear-gradient(135deg, #ff8c00, #ff0080);
+    padding: 14px 44px; border-radius: 20px;
+    box-shadow: 0 0 55px rgba(255,100,0,0.75);
+    text-shadow: 0 0 18px rgba(255,255,255,0.7);
+    white-space: nowrap;
+  }
+  #combo-burst-banner.visible {
+    opacity: 1;
+    animation: burst-pop 1.5s ease-out forwards;
+  }
+  @keyframes burst-pop {
+    0%   { transform:translate(-50%,-50%) scale(0.5); opacity:0; }
+    20%  { transform:translate(-50%,-50%) scale(1.1);  opacity:1; }
+    70%  { transform:translate(-50%,-50%) scale(1.0);  opacity:1; }
+    100% { transform:translate(-50%,-50%) scale(0.9);  opacity:0; }
+  }
+
+  .round-banner {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-family: var(--font-game); font-size: 2.8rem;
+    color: #ffe566;
+    text-shadow: 0 0 38px rgba(255,229,102,0.75), 0 4px 8px rgba(0,0,0,0.8);
+    z-index: 150; pointer-events: none;
+    animation: round-flash 1.2s ease-out forwards; letter-spacing: 4px;
+  }
+  @keyframes round-flash {
+    0%   { opacity:0; transform:translate(-50%,-50%) scale(0.4); }
+    25%  { opacity:1; transform:translate(-50%,-50%) scale(1.15); }
+    65%  { opacity:1; transform:translate(-50%,-50%) scale(1.0); }
+    100% { opacity:0; transform:translate(-50%,-50%) scale(1.2); }
+  }
+
+  /* Animation helpers */
+  @keyframes faint-shatter {
+    0%   { opacity:1; transform:scale(1) rotate(0); filter:grayscale(0); }
+    30%  { transform:scale(1.12) rotate(5deg); filter:grayscale(0.3); }
+    100% { opacity:0; transform:scale(0.5) rotate(-18deg) translateY(28px); filter:grayscale(1); }
+  }
+  .faint-anim    { animation: faint-shatter 0.9s ease-out forwards; }
+  @keyframes shake       { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  @keyframes shake-heavy { 0%,100%{transform:translate(0)} 20%{transform:translate(-9px,4px) rotate(-2deg)} 40%{transform:translate(9px,-4px) rotate(2deg)} 60%{transform:translate(-5px,2px)} 80%{transform:translate(5px,-2px)} }
+  .shake       { animation: shake       0.5s ease-out; }
+  .shake-heavy { animation: shake-heavy 0.5s ease-out; }
+  @keyframes te-flash { 0%,100%{filter:brightness(1)} 40%{filter:brightness(2.4) saturate(2)} }
+  .te-flash { animation: te-flash 0.5s ease-out; }
+
+  /* ============================================================
+     SCREEN 4 — RESULT
+     ============================================================ */
+  #screen-result {
+    flex-direction: column; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; gap: 26px;
+    background: linear-gradient(160deg, #1a3a6e 0%, #2d1a08 100%);
+  }
+  /* bg decorative glow */
+  #screen-result::before {
+    content: '';
+    position: absolute;
+    top: 30%; left: 50%;
+    width: 400px; height: 400px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,229,102,0.15), transparent 60%);
+    pointer-events: none;
+  }
+  #result-title {
+    font-family: var(--font-game);
+    font-size: 4rem;
+    text-align: center;
+    letter-spacing: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .result-win  { color: #4cd964; text-shadow: 0 0 48px rgba(76,217,100,0.65), 0 4px 8px rgba(0,0,0,0.6); }
+  .result-lose { color: #ff3b30; text-shadow: 0 0 48px rgba(255,59,48,0.65), 0 4px 8px rgba(0,0,0,0.6); }
+  #result-rewards {
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 26px 50px;
+    text-align: center;
+    font-family: var(--font-game);
+    font-size: 1.1rem;
+    line-height: 2.1;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    position: relative;
+    z-index: 1;
+  }
+  #result-rewards strong { color: #ffe566; }
+  #btn-play-again {
+    font-family: var(--font-game);
+    background: linear-gradient(135deg, #e8a020, #c45500);
+    color: #fff; border: none;
+    padding: 16px 56px; border-radius: 40px; font-size: 1.15rem;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 6px 0 #7a2d00, 0 10px 24px rgba(0,0,0,0.4);
+    letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    position: relative; overflow: hidden; z-index: 1;
+  }
+  #btn-play-again::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.13) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  #btn-play-again:hover { transform: translateY(3px); box-shadow: 0 3px 0 #7a2d00, 0 5px 14px rgba(0,0,0,0.4); }
+  .confetti-piece {
+    position: absolute; width: 10px; height: 10px; border-radius: 2px;
+    top: -20px; animation: confetti-fall 2.5s ease-in forwards;
+  }
+  @keyframes confetti-fall { 0%{transform:translateY(0) rotate(0); opacity:1;} 100%{transform:translateY(110vh) rotate(720deg); opacity:0;} }
+
+  /* ── Type Color Variables ── */
+  .type-fire     { --type-glow: #ff6030; }
+  .type-water    { --type-glow: #4fc3f7; }
+  .type-grass    { --type-glow: #56e66b; }
+  .type-electric { --type-glow: #ffe566; }
+  .type-psychic  { --type-glow: #ff80ab; }
+  .type-ice      { --type-glow: #aaeeff; }
+  .type-fighting { --type-glow: #e07040; }
+  .type-poison   { --type-glow: #cc55cc; }
+  .type-ground   { --type-glow: #c09a3a; }
+  .type-flying   { --type-glow: #88aaee; }
+  .type-bug      { --type-glow: #99cc33; }
+  .type-rock     { --type-glow: #b8a038; }
+  .type-ghost    { --type-glow: #7060b8; }
+  .type-dragon   { --type-glow: #7038ec; }
+  .type-dark     { --type-glow: #8c6040; }
+  .type-steel    { --type-glow: #aab8c4; }
+  .type-fairy    { --type-glow: #ee88bb; }
+  .type-normal   { --type-glow: #a0a080; }
+
+  /* ── Responsive — smaller screens ── */
+  @media (max-width: 900px) {
+    .unit-sprite { width: 120px !important; height: 120px !important; }
+    .active-unit  .unit-sprite { width: 150px !important; height: 150px !important; }
+    .benched-unit .unit-sprite { width: 105px !important; height: 105px !important; }
+    .unit-hp-badge { min-width: 60px; padding: 2px 7px 4px; }
+    .hp-num-display { font-size: 0.72rem; }
+    #field-player, #field-opponent { bottom: 26%; gap: 4px; }
+    .skill-card { width: 88px; height: 130px; }
+    .card-group-cards { gap: 4px; }
+    .energy-main-badge { width: 50px; height: 50px; }
+    .energy-num { font-size: 1.15rem; }
+    #btn-end-turn { padding: 10px 16px; font-size: 0.85rem; min-width: 90px; }
+    .portrait-badge { width: 24px; height: 24px; }
+    .portrait-badge img { width: 18px; height: 18px; }
+  }
+  @media (max-width: 600px) {
+    .unit-sprite { width: 75px !important; height: 75px !important; }
+    .active-unit  .unit-sprite { width: 95px !important; height: 95px !important; }
+    .benched-unit .unit-sprite { width: 65px !important; height: 65px !important; }
+    .unit-hp-badge { min-width: 50px; padding: 2px 5px 3px; }
+    .hp-num-display { font-size: 0.6rem; }
+    .hp-bar-wrap { height: 4px; }
+    #field-player, #field-opponent { bottom: 24%; gap: 2px; }
+    .skill-card { width: 75px; height: 115px; }
+    .card-group-cards { gap: 3px; }
+    .card-group-header span { font-size: 0.5rem; }
+    .card-group-header img { width: 16px; height: 16px; }
+    .sc-name { font-size: 0.55rem; }
+    .energy-main-badge { width: 40px; height: 40px; }
+    #btn-end-turn { padding: 8px 12px; font-size: 0.75rem; min-width: 75px; }
+    .battle-nameplate { min-width: 110px; padding: 5px 10px; }
+    .nameplate-name { font-size: 0.75rem; }
+    #card-queue-section { padding: 4px 10px; min-height: 44px; }
+    .queue-card { padding: 3px 7px; }
+    .queue-card img { width: 22px; height: 22px; }
+  }
+  </style>
+</head>
+<body>
+
+  <div id="battle-error"></div>
+  <div id="battle-notice"></div>
+
+  <!-- Hidden elements used by battle-main.js -->
+  <span id="battle-greeting" style="display:none"></span>
+
+  <!-- ══════════════════════════════════════════════════
+       SCREEN 1 — MATCHMAKING
+       ══════════════════════════════════════════════════ -->
+  <section id="screen-matchmaking" class="screen">
+    <div class="mm-finding">🔍 FINDING OPPONENT…</div>
+    <div class="mm-vs-row">
+      <div class="mm-trainer-box">
+        <div class="mm-avatar">🧢</div>
+        <div class="mm-name" id="mm-player-name">You</div>
+      </div>
+      <div class="mm-vs-badge">VS</div>
+      <div class="mm-trainer-box">
+        <div class="mm-avatar">🤖</div>
+        <div class="mm-name" id="opponent-name">Wild Trainer</div>
+      </div>
+    </div>
+    <div class="mm-spinner"></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SCREEN 3 — BATTLE ARENA  (Axie Infinity style)
+       ══════════════════════════════════════════════════ -->
+  <section id="screen-battle" class="screen">
+
+    <div id="battle-bg"></div>
+
+    <!-- HUD Top -->
+    <div id="battle-hud">
+      <div class="battle-nameplate player-plate">
+        <span class="nameplate-icon">🧢</span>
+        <div class="nameplate-inner">
+          <span class="nameplate-name" id="hud-player-name">You</span>
+          <span class="nameplate-sub">
+            <span id="energy-player" style="display:inline-flex;gap:3px;align-items:center;font-size:0.65rem;font-family:var(--font-game)">
+              ⚡ 3
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div id="round-counter-wrap">
+        <div id="round-counter">Round 1</div>
+        <div id="turn-phase">Your Turn</div>
+        <div id="team-portraits"></div>
+      </div>
+
+      <div class="battle-nameplate opponent-plate">
+        <span class="nameplate-icon">🤖</span>
+        <div class="nameplate-inner">
+          <span class="nameplate-name" id="hud-opponent-name">AI</span>
+          <span class="nameplate-sub">
+            <span id="energy-opponent" style="display:inline-flex;gap:3px;align-items:center;font-size:0.65rem;font-family:var(--font-game)">
+              ⚡ 3
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queued cards strip — Axie style, below HUD -->
+    <div id="card-queue-section">
+      <div id="card-queue-label">⚔️ QUEUED</div>
+      <div id="card-queue"></div>
+      <div id="queue-energy-cost"></div>
+    </div>
+
+    <!-- Arena -->
+    <div id="battle-arena">
+      <div id="field-opponent"></div>
+      <div id="field-player"></div>
+    </div>
+
+    <!-- rename #battle-field alias (battle-engine/ui may reference it) -->
+    <div id="battle-field" style="display:none"></div>
+
+    <!-- Bottom panel -->
+    <div id="battle-bottom">
+
+      <!-- Combo -->
+      <div id="combo-section">
+        <div id="combo-hud">
+          <div class="combo-fill" style="width:0%"></div>
+          <div class="combo-label">Combo</div>
+        </div>
+        <span class="combo-hint">Same-Pokémon multi-cards → Combo Burst!</span>
+      </div>
+
+      <!-- Cards + energy + end turn -->
+      <div id="cards-actions-row">
+
+        <div id="energy-orb">
+          <div class="energy-main-badge">
+            <span class="energy-num" id="energy-num">3</span>
+            <span class="energy-den" id="energy-den">/9</span>
+          </div>
+          <div id="energy-pips"></div>
+          <span class="energy-label">ENERGY</span>
+        </div>
+
+        <div id="skill-hand"></div>
+
+        <div id="end-turn-wrap">
+          <button id="btn-end-turn" disabled>⚔ End Turn</button>
+          <div class="hint-txt" id="battle-hint">Pick cards → Tap enemy → End Turn!</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- hidden section alias for battle-ui legacy refs -->
+    <div id="skill-hand-section" style="display:none"></div>
+    <div id="battle-actions"     style="display:none"></div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SCREEN 4 — RESULT
+       ══════════════════════════════════════════════════ -->
+  <section id="screen-result" class="screen">
+    <h1 id="result-title" class="result-win">Victory!</h1>
+    <div id="result-rewards"></div>
+    <button id="btn-play-again">🔄 Play Again</button>
+  </section>
+
+  <!-- Overlays -->
+  <div id="combo-burst-banner"></div>
+
+  <!-- Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/evolution.js"></script>
+  <script src="/js/battle-data.js"></script>
+  <script src="/js/battle-engine.js"></script>
+  <script src="/js/battle-ui.js"></script>
+  <script src="/js/battle-main.js"></script>
+
+</body>
+</html>

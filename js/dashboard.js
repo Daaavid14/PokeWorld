@@ -25,7 +25,22 @@ async function authGuard() {
    PROFILE & STATS
    ============================================================ */
 
+// Holds the current session so any panel can re-read user info
+let _currentSession = null;
+
+/**
+ * Format a POKE balance so the display never exceeds 6 digits.
+ * ≥ 1B → "1.0B", ≥ 1M → "1.0M", otherwise locale string (up to 999,999).
+ */
+function formatPokeBalance(n) {
+  n = Number(n) || 0;
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  return n.toLocaleString();
+}
+
 async function loadProfile(session) {
+  _currentSession = session;
   const user = session.user;
   const name = user.user_metadata?.display_name
             || user.user_metadata?.full_name
@@ -44,9 +59,13 @@ async function loadProfile(session) {
     .single();
 
   if (!error && trainer) {
-    document.getElementById('profileRank').textContent = trainer.rank  || 'Rookie Trainer';
-    document.getElementById('tokenBalance').textContent = (trainer.token_balance || 0).toLocaleString();
-    document.getElementById('walletBalance').textContent = `${(trainer.token_balance || 0).toLocaleString()} POKÉ`;
+    const rank = trainer.rank || 'Rookie Trainer';
+    document.getElementById('profileRank').textContent  = rank;
+    const el = document.getElementById('topbarRank');
+    if (el) el.textContent = rank;
+    const bal = formatPokeBalance(trainer.token_balance || 0);
+    document.getElementById('tokenBalance').textContent = bal;
+    document.getElementById('walletBalance').textContent = `${bal} POKÉ`;
 
     // Overview stats
     document.getElementById('totalBattles').textContent = trainer.battles_fought  || 0;
@@ -84,6 +103,8 @@ async function createTrainerProfile(user) {
     }]);
 
   if (!error) {
+    const el = document.getElementById('topbarRank');
+    if (el) el.textContent = 'Rookie Trainer';
     document.getElementById('tokenBalance').textContent = '100';
     document.getElementById('walletBalance').textContent = '100 POKÉ';
     showToast('Welcome to PokéWorld! You received 100 POKÉ as a welcome bonus! 🎉', 'success', 5000);
@@ -95,83 +116,125 @@ async function createTrainerProfile(user) {
    ============================================================ */
 
 async function loadStarterPokemon(userId) {
-  const grid     = document.getElementById('starterGrid');
-  const totalEl  = document.getElementById('totalPokemon');
+  const grid    = document.getElementById('starterGrid');
+  const totalEl = document.getElementById('totalPokemon');
   if (!grid) return;
 
   try {
-    // Fetch owned Pokemon from DB
     const { data: owned } = await _supabase
       .from('owned_pokemon')
       .select('id, pokemon_id, species, nickname, level, experience')
       .eq('user_id', userId)
       .limit(3);
 
-    let ids;
-    // Check if all owned rows are using the default species (corrupt starter insert)
-    const allSameSpecies = owned?.length > 0 && owned.every(r => r.species === owned[0].species);
-    const starterDefaults = ['Bulbasaur', 'Charmander', 'Squirtle'];
+    const allSameSpecies  = owned?.length > 0 && owned.every(r => r.species === owned[0].species);
     const isCorruptStarters = allSameSpecies && owned?.length === 3 && owned[0].species === 'Bulbasaur';
 
-    if (owned && owned.length > 0 && !isCorruptStarters) {
-      ids = owned.map(r => r.pokemon_id || r.id);
-    } else {
-      // Delete corrupt starter rows if they exist so we can re-insert correctly
-      if (isCorruptStarters) {
-        await _supabase.from('owned_pokemon').delete().eq('user_id', userId);
-        owned.length = 0;
-      }
-      // Assign the 3 classic starters if none owned
-      const starterSpecies  = ['Bulbasaur', 'Charmander', 'Squirtle'];
-      const starterPokedexIds = [1, 4, 7]; // Bulbasaur=1, Charmander=4, Squirtle=7
-      ids = starterSpecies;
+    if (isCorruptStarters) {
+      await _supabase.from('owned_pokemon').delete().eq('user_id', userId);
+      owned.length = 0;
+    }
+
+    if (!owned?.length) {
+      const starterSpecies    = ['Bulbasaur', 'Charmander', 'Squirtle'];
+      const starterPokedexIds = [1, 4, 7];
       const insertData = starterSpecies.map((species, i) => ({
-        user_id:         userId,
-        pokemon_id:      starterPokedexIds[i],
-        species:         species,
-        nickname:        null,
-        level:           1,
-        experience:      0,
-        evolution_stage: 'base',
+        user_id: userId, pokemon_id: starterPokedexIds[i],
+        species, nickname: null, level: 1, experience: 0, evolution_stage: 'base',
       }));
       const { data: inserted } = await _supabase
-        .from('owned_pokemon')
-        .insert(insertData)
+        .from('owned_pokemon').insert(insertData)
         .select('id, pokemon_id, species, nickname, level, experience');
       if (inserted) owned?.push(...inserted);
     }
 
-    if (totalEl) totalEl.textContent = owned ? owned.length : ids.length;
+    if (totalEl) totalEl.textContent = owned ? owned.length : 0;
 
-    // Use local metadata + GIF assets via evolution engine
-    grid.innerHTML = '';
-
-    // Build default starter rows list if we just assigned them
     const starterNames = ['Bulbasaur','Charmander','Squirtle'];
     const rows = owned?.length
       ? owned.slice(0, 3)
       : starterNames.map((s, i) => ({ id: `starter-${i}`, species: s, nickname: null, level: 1, experience: 0 }));
 
+    grid.innerHTML = '';
     for (const row of rows) {
-      const species = row.species || starterNames[0];
-      const card = await PokéEvolution.buildPokemonCard({
-        nftId:      row.id,
-        species,
-        nickname:   row.nickname,
-        level:      row.level || 1,
-        experience: row.experience || 0,
-        userId,
-        onEvolved: async (nftId, newSpecies, level) => {
-          showToast(`✨ ${species} evolved into ${newSpecies}!`, 'success', 5000);
-          await loadStarterPokemon(userId);
-        },
+      const species     = row.species || starterNames[0];
+      const rowIdStr    = String(row.id);
+      const colorIdx    = rowIdStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 6;
+      const uniqueId    = rowIdStr.slice(-6).toUpperCase();
+      const meta        = await PokéEvolution.fetchPokemonMeta(species);
+      const attrs       = meta?.attributes || [];
+      const hp   = PokéEvolution.getStat(attrs, 'HP')  || '—';
+      const atk  = PokéEvolution.getStat(attrs, 'ATK') || '—';
+      const def  = PokéEvolution.getStat(attrs, 'DEF') || '—';
+      const spd  = PokéEvolution.getStat(attrs, 'SPD') || '—';
+      const type   = PokéEvolution.getStat(attrs, 'Type')   || 'Normal';
+      const rarity = PokéEvolution.getStat(attrs, 'Rarity') || 'Common';
+      const gifSrc      = PokéEvolution.getGifPath(species);
+      const displayName = sanitize(row.nickname || species);
+      const level       = row.level || 1;
+      const xpPct       = Math.min(100, Math.round(((row.experience || 0) % 1000) / 10));
+      const { canEvolve, evolvesTo } = PokéEvolution.checkEvolution(species, level);
+
+      const card = document.createElement('div');
+      card.className       = 'mkt-card';
+      card.dataset.rowId   = row.id;
+      card.dataset.species = species;
+      card.innerHTML = `
+        <span class="mkt-card-id mkt-id-${colorIdx}">#${uniqueId}</span>
+        <div class="mkt-card-img-wrap mkt-bg-${colorIdx}">
+          <img class="mkt-card-gif" src="${gifSrc}" alt="${displayName}"
+               onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'" />
+        </div>
+        <div class="mkt-card-info">
+          <span class="mkt-card-name">${displayName}</span>
+          <div class="mkt-card-meta">
+            <span class="mkt-card-level">Lv. ${level}</span>
+            <span class="type-badge type-${type.toLowerCase()} mkt-badge-sm">${type}</span>
+            <span class="stage-badge stage-${(PokéEvolution.SPECIES_STAGE[species]||'base').toLowerCase()} mkt-badge-sm">${rarity}</span>
+          </div>
+          <div class="mkt-card-stats">
+            <span class="mkt-stat">H: <b>${hp}</b></span>
+            <span class="mkt-stat">A: <b>${atk}</b></span>
+            <span class="mkt-stat">D: <b>${def}</b></span>
+            <span class="mkt-stat">S: <b>${spd}</b></span>
+          </div>
+          <div class="mkt-xp-bar" title="${xpPct}% XP">
+            <div class="mkt-xp-fill" style="width:${xpPct}%"></div>
+          </div>
+        </div>
+        <div class="mkt-card-footer mkt-footer-center">
+          ${canEvolve
+            ? `<button class="mkt-buy-btn evolve-btn"
+                       data-row-id="${row.id}">✨ Evolve</button>`
+            : `<span class="mkt-xp-hint">Lv. ${level} · ${xpPct}% XP</span>`
+          }
+        </div>
+      `;
+
+      if (canEvolve) {
+        card.querySelector('.evolve-btn')?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const newSpecies = await PokéEvolution.performEvolution(row.id, userId, species, level);
+            showToast(`✨ ${species} evolved into ${newSpecies}!`, 'success', 5000);
+            await loadStarterPokemon(userId);
+          } catch (err) {
+            showToast(err.message || 'Evolution failed.', 'error');
+          }
+        });
+      }
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.evolve-btn')) return;
+        openPokemonDetailModal(species, row.nickname, level, row.experience || 0);
       });
+
       grid.appendChild(card);
     }
 
   } catch (err) {
     console.error('[Starters] Error:', err);
-    grid.innerHTML = '<p style="color:var(--text-muted)">Failed to load Pokémon.</p>';
+    grid.innerHTML = '<p class="poke-load-error">Failed to load Pokémon.</p>';
   }
 }
 
@@ -197,7 +260,7 @@ async function loadMyPokemon(userId) {
       return;
     }
 
-    // Ensure species field is populated (fallback using pokemon_id mapping)
+    // Ensure species field is populated
     const pokedexToSpecies = { 1: 'Bulbasaur', 4: 'Charmander', 7: 'Squirtle' };
     for (const row of owned) {
       if (!row.species) row.species = pokedexToSpecies[row.pokemon_id] || 'Bulbasaur';
@@ -205,38 +268,109 @@ async function loadMyPokemon(userId) {
 
     grid.innerHTML = '';
     for (const row of owned) {
-      const species = row.species || 'Bulbasaur';
-      const card = await PokéEvolution.buildPokemonCard({
-        nftId:      row.id,
-        species,
-        nickname:   row.nickname,
-        level:      row.level || 1,
-        experience: row.experience || 0,
-        userId,
-        onEvolved: async (nftId, newSpecies) => {
-          showToast(`✨ ${species} evolved into ${newSpecies}!`, 'success', 5000);
-          await loadMyPokemon(userId);
-        },
+      const species     = row.species || 'Bulbasaur';
+      const rowIdStr    = String(row.id);
+      const colorIdx    = rowIdStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 6;
+      const uniqueId    = rowIdStr.slice(-6).toUpperCase();
+      const meta        = await PokéEvolution.fetchPokemonMeta(species);
+      const attrs       = meta?.attributes || [];
+      const hp    = PokéEvolution.getStat(attrs, 'HP')  || '—';
+      const atk   = PokéEvolution.getStat(attrs, 'ATK') || '—';
+      const def   = PokéEvolution.getStat(attrs, 'DEF') || '—';
+      const spd   = PokéEvolution.getStat(attrs, 'SPD') || '—';
+      const type   = PokéEvolution.getStat(attrs, 'Type')   || 'Normal';
+      const rarity = PokéEvolution.getStat(attrs, 'Rarity') || 'Common';
+      const gifSrc      = PokéEvolution.getGifPath(species);
+      const displayName = sanitize(row.nickname || species);
+      const level       = row.level || 1;
+      const xpPct       = Math.min(100, Math.round(((row.experience || 0) % 1000) / 10));
+      const { canEvolve, evolvesTo } = PokéEvolution.checkEvolution(species, level);
+
+      const card = document.createElement('div');
+      card.className        = 'mkt-card';
+      card.dataset.rowId    = row.id;
+      card.dataset.species  = species;
+      card.dataset.types    = type.toLowerCase();
+      card.dataset.stage    = (PokéEvolution.SPECIES_STAGE[species] || 'base').toLowerCase();
+      card.innerHTML = `
+        <span class="mkt-card-id mkt-id-${colorIdx}">#${uniqueId}</span>
+        <div class="mkt-card-img-wrap mkt-bg-${colorIdx}">
+          <img class="mkt-card-gif" src="${gifSrc}" alt="${displayName}"
+               onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'" />
+        </div>
+        <div class="mkt-card-info">
+          <span class="mkt-card-name">${displayName}</span>
+          <div class="mkt-card-meta">
+            <span class="mkt-card-level">Lv. ${level}</span>
+            <span class="type-badge type-${type.toLowerCase()} mkt-badge-sm">${type}</span>
+            <span class="stage-badge stage-${card.dataset.stage} mkt-badge-sm">${rarity}</span>
+          </div>
+          <div class="mkt-card-stats">
+            <span class="mkt-stat">H: <b>${hp}</b></span>
+            <span class="mkt-stat">A: <b>${atk}</b></span>
+            <span class="mkt-stat">D: <b>${def}</b></span>
+            <span class="mkt-stat">S: <b>${spd}</b></span>
+          </div>
+          <div class="mkt-xp-bar" title="${xpPct}% XP to next level">
+            <div class="mkt-xp-fill" style="width:${xpPct}%"></div>
+          </div>
+        </div>
+        <div class="mkt-card-footer mkt-footer-center">
+          ${canEvolve
+            ? `<button class="mkt-buy-btn evolve-btn"
+                       data-row-id="${row.id}">✨ Evolve</button>`
+            : `<span class="mkt-xp-hint">Lv. ${level} · ${xpPct}% XP</span>`
+          }
+        </div>
+      `;
+
+      // Evolve button handler
+      if (canEvolve) {
+        card.querySelector('.evolve-btn')?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const newSpecies = await PokéEvolution.performEvolution(row.id, userId, species, level);
+            showToast(`✨ ${species} evolved into ${newSpecies}!`, 'success', 5000);
+            await loadMyPokemon(userId);
+          } catch (err) {
+            showToast(err.message || 'Evolution failed.', 'error');
+          }
+        });
+      }
+
+      // Click card → detail modal
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.evolve-btn')) return;
+        openPokemonDetailModal(species, row.nickname, level, row.experience || 0);
       });
+
       grid.appendChild(card);
     }
 
-    // Pokemon search filter
-    document.getElementById('pokemonSearch')?.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase();
-      grid.querySelectorAll('.nft-card').forEach(c => {
-        const name = c.querySelector('.card-name')?.textContent.toLowerCase() || '';
-        c.style.display = name.includes(query) ? '' : 'none';
+    // Search filter
+    const searchEl = document.getElementById('pokemonSearch');
+    if (searchEl && !searchEl.dataset.bound) {
+      searchEl.dataset.bound = '1';
+      searchEl.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        grid.querySelectorAll('.mkt-card').forEach(c => {
+          const name = (c.querySelector('.mkt-card-name')?.textContent || '').toLowerCase();
+          c.style.display = name.includes(query) ? '' : 'none';
+        });
       });
-    });
+    }
 
     // Type filter
-    document.getElementById('pokemonFilter')?.addEventListener('change', (e) => {
-      const type = e.target.value;
-      grid.querySelectorAll('.nft-card').forEach(c => {
-        c.style.display = (type === 'all' || c.dataset.types?.includes(type)) ? '' : 'none';
+    const filterEl = document.getElementById('pokemonFilter');
+    if (filterEl && !filterEl.dataset.bound) {
+      filterEl.dataset.bound = '1';
+      filterEl.addEventListener('change', (e) => {
+        const type = e.target.value;
+        grid.querySelectorAll('.mkt-card').forEach(c => {
+          c.style.display = (type === 'all' || (c.dataset.types || '').includes(type)) ? '' : 'none';
+        });
       });
-    });
+    }
 
   } catch (err) {
     console.error('[My Pokemon] Error:', err);
@@ -260,7 +394,6 @@ function navigateToPanel(panelId, userId) {
 
   if (panelId === 'my-pokemon')  loadMyPokemon(userId);
   if (panelId === 'marketplace') { _marketplaceInited = false; initMarketplace(userId); }
-  if (panelId === 'battles')     initBattlePanel(userId);
 }
 
 /* ============================================================
@@ -273,8 +406,12 @@ function initSidebarNav(userId) {
 
   links.forEach(link => {
     link.addEventListener('click', (e) => {
+      // Skip external links (e.g. Game opens in new tab)
+      if (link.target === '_blank') return;
+
       e.preventDefault();
       const panelId = link.dataset.panel;
+      if (!panelId) return;
 
       // Activate link
       links.forEach(l => l.classList.remove('active'));
@@ -288,7 +425,7 @@ function initSidebarNav(userId) {
       // Lazy-load panel data
       if (panelId === 'my-pokemon')  loadMyPokemon(userId);
       if (panelId === 'marketplace') initMarketplace(userId);
-      if (panelId === 'battles')     initBattlePanel(userId);
+      if (panelId === 'settings')    refreshSettingsFields();
 
       // Close sidebar on mobile
       if (window.innerWidth < 768) {
@@ -302,6 +439,36 @@ function initSidebarNav(userId) {
 /* ============================================================
    PROFILE SETTINGS FORM
    ============================================================ */
+
+/**
+ * Re-populates the settings username/email fields from the
+ * stored session + a fresh DB read. Safe to call any time.
+ */
+async function refreshSettingsFields() {
+  const session = _currentSession;
+  if (!session) return;
+  const user = session.user;
+
+  const emailEl    = document.getElementById('settingsEmail');
+  const usernameEl = document.getElementById('settingsUsername');
+
+  if (emailEl && user.email) emailEl.value = user.email;
+
+  // Fetch latest username from DB
+  const { data: trainer } = await _supabase
+    .from('trainer_profiles')
+    .select('username')
+    .eq('user_id', user.id)
+    .single();
+
+  if (usernameEl) {
+    usernameEl.value = trainer?.username
+      || user.user_metadata?.display_name
+      || user.user_metadata?.full_name
+      || user.email?.split('@')[0]
+      || '';
+  }
+}
 
 function initProfileForm(userId) {
   const form = document.getElementById('profileForm');
@@ -320,28 +487,34 @@ function initProfileForm(userId) {
     const btn = form.querySelector('button[type=submit]');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
+    // Clear previous error
+    const errEl = document.getElementById('profileError');
+    if (errEl) { errEl.textContent = ''; errEl.classList.remove('show'); }
+
     try {
-      // Update trainer_profiles table
+      // Update trainer_profiles table — do NOT sanitize here; sanitize is for HTML display only
       const { error: dbError } = await _supabase
         .from('trainer_profiles')
-        .update({ username: sanitize(username) })
+        .update({ username })
         .eq('user_id', userId);
-
-      // Update user metadata
-      await _supabase.auth.updateUser({
-        data: { display_name: sanitize(username) },
-      });
 
       if (dbError) throw dbError;
 
-      document.getElementById('profileName').textContent = username;
-      document.getElementById('topbarUsername').textContent = username;
+      // Update user metadata
+      await _supabase.auth.updateUser({
+        data: { display_name: username },
+      });
+
+      document.getElementById('profileName').textContent = sanitize(username);
+      document.getElementById('topbarUsername').textContent = sanitize(username);
       showToast('Profile updated successfully! ✅', 'success');
 
     } catch (err) {
       console.error('[Profile] Update error:', err);
-      document.getElementById('profileError').textContent = 'Failed to update profile.';
-      document.getElementById('profileError').classList.add('show');
+      if (errEl) {
+        errEl.textContent = err.message || 'Failed to update profile.';
+        errEl.classList.add('show');
+      }
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
     }
@@ -499,7 +672,7 @@ async function refreshChainBalance(address) {
   try {
     if (!address || !window.PokéChain) return;
     const balance = await window.PokéChain.getPokeBalance(address);
-    const formatted = balance.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const formatted = formatPokeBalance(balance);
     const balEl = document.getElementById('tokenBalance');
     const walEl = document.getElementById('walletBalance');
     if (balEl) balEl.textContent = formatted;
@@ -789,8 +962,8 @@ async function handleShopMint({ userId, species, btn }) {
 
       // Refresh topbar balance
       const newBal = Math.max(0, trainer.token_balance - window.PokéChain.MINT_PRICE);
-      document.getElementById('tokenBalance').textContent = newBal.toLocaleString();
-      document.getElementById('walletBalance').textContent = `${newBal.toLocaleString()} POKÉ`;
+      document.getElementById('tokenBalance').textContent = formatPokeBalance(newBal);
+      document.getElementById('walletBalance').textContent = `${formatPokeBalance(newBal)} POKÉ`;
     }
 
     // Update overview Pokémon count
@@ -841,7 +1014,7 @@ async function handlePackBuy(userId) {
       const newBal = Math.max(0, trainer.token_balance - window.PokéChain.PACK_PRICE);
       await _supabase.from('trainer_profiles')
         .update({ token_balance: newBal }).eq('user_id', userId);
-      document.getElementById('tokenBalance').textContent = newBal.toLocaleString();
+      document.getElementById('tokenBalance').textContent = formatPokeBalance(newBal);
     }
 
     // Update overview Pokémon count
@@ -952,38 +1125,74 @@ async function loadMarketListings(userId) {
       const pkm = listing.owned_pokemon;
       if (!pkm) continue;
 
-      const species = pkm.species || 'Bulbasaur';
-      const isOwn   = pkm.user_id === userId;
-      const card    = await PokéEvolution.buildPokemonCard({
-        nftId:      pkm.id,
-        species,
-        nickname:   pkm.nickname,
-        level:      pkm.level || 1,
-        experience: pkm.experience || 0,
-        userId,
-        onEvolved:  null,  // no evolving from marketplace
+      const species    = pkm.species || 'Bulbasaur';
+      const isOwn      = pkm.user_id === userId;
+      const pkmIdStr   = String(pkm.id);
+      const colorIdx   = pkmIdStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 6;
+      const nftId      = pkmIdStr.slice(-6).toUpperCase();
+      const meta       = await PokéEvolution.fetchPokemonMeta(species);
+      const attrs      = meta?.attributes || [];
+      const hp  = PokéEvolution.getStat(attrs, 'HP')  || '—';
+      const atk = PokéEvolution.getStat(attrs, 'ATK') || '—';
+      const def = PokéEvolution.getStat(attrs, 'DEF') || '—';
+      const spd = PokéEvolution.getStat(attrs, 'SPD') || '—';
+      const type    = PokéEvolution.getStat(attrs, 'Type')   || 'Normal';
+      const rarity  = PokéEvolution.getStat(attrs, 'Rarity') || 'Common';
+      const gifSrc  = PokéEvolution.getGifPath(species);
+      const displayName = sanitize(pkm.nickname || species);
+
+      const card = document.createElement('div');
+      card.className = 'mkt-card';
+      card.dataset.species  = species;
+      card.dataset.types    = type.toLowerCase();
+      card.dataset.stage    = (PokéEvolution.SPECIES_STAGE[species] || 'base').toLowerCase();
+      card.dataset.price    = listing.price;
+      card.dataset.listedAt = listing.listed_at;
+      card.innerHTML = `
+        <span class="mkt-card-id mkt-id-${colorIdx}">#${nftId}</span>
+        ${isOwn ? '<span class="mkt-card-own-badge">Yours</span>' : ''}
+        <div class="mkt-card-img-wrap mkt-bg-${colorIdx}">
+          <img class="mkt-card-gif" src="${gifSrc}" alt="${displayName}"
+               onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'" />
+        </div>
+        <div class="mkt-card-info">
+          <span class="mkt-card-name">${displayName}</span>
+          <div class="mkt-card-meta">
+            <span class="mkt-card-level">Lv. ${pkm.level || 1}</span>
+            <span class="type-badge type-${type.toLowerCase()} mkt-badge-sm">${type}</span>
+            <span class="stage-badge stage-${card.dataset.stage} mkt-badge-sm">${rarity}</span>
+          </div>
+          <div class="mkt-card-stats">
+            <span class="mkt-stat">H: <b>${hp}</b></span>
+            <span class="mkt-stat">A: <b>${atk}</b></span>
+            <span class="mkt-stat">D: <b>${def}</b></span>
+            <span class="mkt-stat">S: <b>${spd}</b></span>
+          </div>
+        </div>
+        <div class="mkt-card-footer">
+          <span class="mkt-card-price">${listing.price.toLocaleString()} POKÉ</span>
+          ${isOwn
+            ? `<button class="mkt-buy-btn cancel cancel-listing-btn"
+                       data-listing-id="${listing.id}">Delist</button>`
+            : `<button class="mkt-buy-btn buy-btn"
+                       data-listing-id="${listing.id}"
+                       data-species="${sanitize(species)}"
+                       data-price="${listing.price}"
+                       data-nickname="${sanitize(pkm.nickname || species)}">Buy</button>`
+          }
+        </div>
+      `;
+
+      // Click card body → detail modal
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.buy-btn, .cancel-listing-btn, .mkt-buy-btn')) return;
+        openPokemonDetailModal(species, pkm.nickname, pkm.level || 1, pkm.experience || 0);
       });
 
-      // Add market overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'market-overlay';
-      overlay.innerHTML = `
-        <div class="market-price">💰 ${listing.price.toLocaleString()} POKÉ</div>
-        ${isOwn
-          ? `<button class="btn btn-danger-outline btn-sm cancel-listing-btn"
-                     data-listing-id="${listing.id}">Cancel Listing</button>`
-          : `<button class="btn btn-primary btn-sm buy-btn"
-                     data-listing-id="${listing.id}"
-                     data-species="${sanitize(species)}"
-                     data-price="${listing.price}"
-                     data-nickname="${sanitize(pkm.nickname || species)}">Buy Now</button>`
-        }
-      `;
-      card.appendChild(overlay);
       grid.appendChild(card);
     }
 
-    // Buy handlers (event delegation)
+    // Buy / cancel handlers (event delegation)
     grid.addEventListener('click', async (e) => {
       const buyBtn = e.target.closest('.buy-btn');
       if (buyBtn) {
@@ -1007,19 +1216,35 @@ async function loadMarketListings(userId) {
 
 function filterMarket() {
   const query = (document.getElementById('marketSearch')?.value || '').toLowerCase();
-  const type  = document.getElementById('marketTypeFilter')?.value || 'all';
+  const type  = document.getElementById('marketTypeFilter')?.value  || 'all';
   const stage = document.getElementById('marketStageFilter')?.value || 'all';
+  const sort  = document.getElementById('marketSortFilter')?.value  || 'price-asc';
 
-  document.querySelectorAll('#marketGrid .nft-card').forEach(card => {
-    const name  = (card.querySelector('.nft-card-header .card-name, .card-name')?.textContent || '').toLowerCase();
-    const cType = card.dataset.types || '';
-    const cStage= card.dataset.stage || '';
+  const grid  = document.getElementById('marketGrid');
+  if (!grid) return;
+
+  const cards = [...grid.querySelectorAll('.mkt-card')];
+
+  cards.forEach(card => {
+    const name   = (card.querySelector('.mkt-card-name')?.textContent || '').toLowerCase();
+    const cType  = card.dataset.types || '';
+    const cStage = card.dataset.stage || '';
 
     const matchQ = !query || name.includes(query);
     const matchT = type  === 'all' || cType.includes(type);
-    const matchS = stage === 'all' || cStage.includes(stage);
+    const matchS = stage === 'all' || cStage === stage;
     card.style.display = (matchQ && matchT && matchS) ? '' : 'none';
   });
+
+  // Sort visible cards
+  const visible = cards.filter(c => c.style.display !== 'none');
+  visible.sort((a, b) => {
+    if (sort === 'price-asc')   return parseInt(a.dataset.price)    - parseInt(b.dataset.price);
+    if (sort === 'price-desc')  return parseInt(b.dataset.price)    - parseInt(a.dataset.price);
+    if (sort === 'newest')      return new Date(b.dataset.listedAt) - new Date(a.dataset.listedAt);
+    return 0;
+  });
+  visible.forEach(c => grid.appendChild(c));
 }
 
 async function loadSellPicker(userId) {
@@ -1033,7 +1258,7 @@ async function loadSellPicker(userId) {
     .from('owned_pokemon')
     .select('id, species, nickname, level, experience')
     .eq('user_id', userId)
-    .is('listing_id', null);  // not already listed
+    .is('listing_id', null);
 
   if (!owned?.length) {
     picker.innerHTML = '<div class="empty-state">No Pokémon available to sell.</div>';
@@ -1042,13 +1267,50 @@ async function loadSellPicker(userId) {
 
   picker.innerHTML = '';
   for (const row of owned) {
-    const species = row.species || 'Bulbasaur';
-    const card    = await PokéEvolution.buildPokemonCard({
-      nftId: row.id, species, nickname: row.nickname,
-      level: row.level || 1, experience: row.experience || 0,
-      userId, onEvolved: null,
-    });
-    card.style.cursor = 'pointer';
+    const species   = row.species || 'Bulbasaur';
+    const rowIdStr  = String(row.id);
+    const colorIdx  = rowIdStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 6;
+    const meta      = await PokéEvolution.fetchPokemonMeta(species);
+    const attrs     = meta?.attributes || [];
+    const hp   = PokéEvolution.getStat(attrs, 'HP')  || '—';
+    const atk  = PokéEvolution.getStat(attrs, 'ATK') || '—';
+    const def  = PokéEvolution.getStat(attrs, 'DEF') || '—';
+    const spd  = PokéEvolution.getStat(attrs, 'SPD') || '—';
+    const type   = PokéEvolution.getStat(attrs, 'Type')   || 'Normal';
+    const rarity = PokéEvolution.getStat(attrs, 'Rarity') || 'Common';
+    const gifSrc      = PokéEvolution.getGifPath(species);
+    const displayName = sanitize(row.nickname || species);
+
+    const card = document.createElement('div');
+    card.className = 'mkt-card';
+    card.dataset.rowId = row.id;
+    card.style.cursor  = 'pointer';
+    card.innerHTML = `
+      <span class="mkt-card-id mkt-id-${colorIdx}">#${rowIdStr.slice(-6).toUpperCase()}</span>
+      <div class="mkt-card-img-wrap mkt-bg-${colorIdx}">
+        <img class="mkt-card-gif" src="${gifSrc}" alt="${displayName}"
+             onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'" />
+      </div>
+      <div class="mkt-card-info">
+        <span class="mkt-card-name">${displayName}</span>
+        <div class="mkt-card-meta">
+          <span class="mkt-card-level">Lv. ${row.level || 1}</span>
+          <span class="type-badge type-${type.toLowerCase()} mkt-badge-sm">${type}</span>
+          <span class="stage-badge stage-${(PokéEvolution.SPECIES_STAGE[species]||'base').toLowerCase()} mkt-badge-sm">${rarity}</span>
+        </div>
+        <div class="mkt-card-stats">
+          <span class="mkt-stat">H: <b>${hp}</b></span>
+          <span class="mkt-stat">A: <b>${atk}</b></span>
+          <span class="mkt-stat">D: <b>${def}</b></span>
+          <span class="mkt-stat">S: <b>${spd}</b></span>
+        </div>
+      </div>
+      <div class="mkt-card-footer mkt-footer-center">
+        <span class="mkt-buy-btn mkt-select-btn">
+          Select
+        </span>
+      </div>
+    `;
     card.addEventListener('click', () => selectForSale(row, card, userId));
     picker.appendChild(card);
   }
@@ -1056,7 +1318,7 @@ async function loadSellPicker(userId) {
 
 let _selectedForSale = null;
 function selectForSale(row, cardEl, userId) {
-  document.querySelectorAll('#sellPicker .nft-card').forEach(c => c.classList.remove('selected-for-sale'));
+  document.querySelectorAll('#sellPicker .mkt-card').forEach(c => c.classList.remove('selected-for-sale'));
   cardEl.classList.add('selected-for-sale');
   _selectedForSale = row;
 
@@ -1119,6 +1381,97 @@ function selectForSale(row, cardEl, userId) {
     _selectedForSale = null;
     cardEl.classList.remove('selected-for-sale');
   });
+}
+
+/* ============================================================
+   POKÉMON DETAIL MODAL
+   ============================================================ */
+
+async function openPokemonDetailModal(species, nickname, level, experience) {
+  const modal = document.getElementById('pokeDetailModal');
+  if (!modal) return;
+
+  // Reset
+  document.getElementById('pokeDetailSkills').innerHTML =
+    '<span class="poke-loading-text">Loading...</span>';
+  modal.classList.remove('hidden');
+
+  const meta  = await PokéEvolution.fetchPokemonMeta(species);
+  const attrs = meta?.attributes || [];
+
+  const hp     = PokéEvolution.getStat(attrs, 'HP');
+  const atk    = PokéEvolution.getStat(attrs, 'ATK');
+  const def    = PokéEvolution.getStat(attrs, 'DEF');
+  const spd    = PokéEvolution.getStat(attrs, 'SPD');
+  const type   = PokéEvolution.getStat(attrs, 'Type')            || 'Normal';
+  const rarity = PokéEvolution.getStat(attrs, 'Rarity')          || 'Common';
+  const stage  = PokéEvolution.getStat(attrs, 'Evolution Stage') || 'Base';
+
+  const displayName = sanitize(nickname || species);
+  const gifEl = document.getElementById('pokeDetailGif');
+  gifEl.src = PokéEvolution.getGifPath(species);
+  gifEl.alt = displayName;
+
+  document.getElementById('pokeDetailTitle').textContent = displayName;
+  document.getElementById('pokeDetailLevel').textContent = `Lv. ${level}`;
+
+  const typeEl = document.getElementById('pokeDetailType');
+  typeEl.textContent = type;
+  typeEl.className   = `type-badge type-${type.toLowerCase()}`;
+
+  const rarityEl = document.getElementById('pokeDetailRarity');
+  rarityEl.textContent = rarity;
+  rarityEl.className   = `rarity-badge rarity-badge-${rarity.toLowerCase()}`;
+
+  const stageEl = document.getElementById('pokeDetailStage');
+  stageEl.textContent = stage;
+  stageEl.className   = `stage-badge stage-${stage.toLowerCase()}`;
+
+  const xpCurrent = (experience || 0) % 1000;
+  document.getElementById('pokeDetailXpFill').style.width = Math.min(100, Math.round(xpCurrent / 10)) + '%';
+  document.getElementById('pokeDetailXpLbl').textContent  = `${xpCurrent}/1000 XP`;
+
+  document.getElementById('pokeDetailHp').textContent  = hp  || '—';
+  document.getElementById('pokeDetailAtk').textContent = atk || '—';
+  document.getElementById('pokeDetailDef').textContent = def || '—';
+  document.getElementById('pokeDetailSpd').textContent = spd || '—';
+
+  // All 4 skills — rendered as gradient cards
+  const skillsDiv = document.getElementById('pokeDetailSkills');
+  skillsDiv.innerHTML = '';
+  let skillCount = 0;
+  for (let i = 1; i <= 4; i++) {
+    const sName = PokéEvolution.getStat(attrs, `Skill ${i} Name`);
+    const sPow  = PokéEvolution.getStat(attrs, `Skill ${i} Attack`);
+    const sEff  = PokéEvolution.getStat(attrs, `Skill ${i} Effect`);
+    if (!sName) continue;
+    skillCount++;
+    const card = document.createElement('div');
+    card.className = 'skill-card';
+    card.innerHTML = `
+      <span class="skill-card-name">${sanitize(sName)}</span>
+      <span class="skill-card-power">${sPow || '—'}</span>
+      ${sEff ? `<span class="skill-card-effect">${sanitize(sEff)}</span>` : ''}
+    `;
+    skillsDiv.appendChild(card);
+  }
+  if (!skillCount) {
+    skillsDiv.style.display = 'block';
+    skillsDiv.innerHTML = '<span class="skill-empty-text">No skill data available.</span>';
+  } else {
+    skillsDiv.style.display = '';
+  }
+
+  // Evolution line
+  const { canEvolve, evolvesTo, evolvesAtLevel } = PokéEvolution.checkEvolution(species, level);
+  const evoDiv = document.getElementById('pokeDetailEvoLine');
+  if (evolvesTo && evolvesAtLevel) {
+    evoDiv.textContent = canEvolve
+      ? `✨ Ready to evolve → ${evolvesTo}!`
+      : `Evolves → ${evolvesTo} at Lv. ${evolvesAtLevel}`;
+  } else {
+    evoDiv.textContent = '🏆 Max Evolution Stage';
+  }
 }
 
 function openBuyModal(listingId, species, nickname, price, userId) {
@@ -1227,6 +1580,8 @@ async function loadMyListings(userId) {
   const grid = document.getElementById('myListingsGrid');
   if (!grid) return;
 
+  grid.innerHTML = '<div class="empty-state"><p>Loading your listings...</p></div>';
+
   const { data: listings } = await _supabase
     .from('market_listings')
     .select('id, price, status, listed_at, owned_pokemon(id, species, nickname, level, experience)')
@@ -1234,7 +1589,7 @@ async function loadMyListings(userId) {
     .order('listed_at', { ascending: false });
 
   if (!listings?.length) {
-    grid.innerHTML = '<div class="empty-state"><p>You have no active listings.</p></div>';
+    grid.innerHTML = '<div class="empty-state"><p>You have no listings yet.</p></div>';
     return;
   }
 
@@ -1242,22 +1597,53 @@ async function loadMyListings(userId) {
   for (const listing of listings) {
     const pkm = listing.owned_pokemon;
     if (!pkm) continue;
-    const species = pkm.species || 'Bulbasaur';
-    const card = await PokéEvolution.buildPokemonCard({
-      nftId: pkm.id, species, nickname: pkm.nickname,
-      level: pkm.level || 1, experience: pkm.experience || 0,
-      userId, onEvolved: null,
-    });
-    const badge = document.createElement('div');
-    badge.className = `market-overlay status-${listing.status}`;
-    badge.innerHTML = `
-      <div class="market-price">💰 ${listing.price.toLocaleString()} POKÉ</div>
-      <span class="listing-status-badge">${listing.status.toUpperCase()}</span>
-      ${listing.status === 'active'
-        ? `<button class="btn btn-danger-outline btn-sm cancel-listing-btn" data-listing-id="${listing.id}">Cancel</button>`
-        : ''}
+    const species   = pkm.species || 'Bulbasaur';
+    const pkmIdStr  = String(pkm.id);
+    const colorIdx  = pkmIdStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 6;
+    const meta      = await PokéEvolution.fetchPokemonMeta(species);
+    const attrs     = meta?.attributes || [];
+    const hp   = PokéEvolution.getStat(attrs, 'HP')  || '—';
+    const atk  = PokéEvolution.getStat(attrs, 'ATK') || '—';
+    const def  = PokéEvolution.getStat(attrs, 'DEF') || '—';
+    const spd  = PokéEvolution.getStat(attrs, 'SPD') || '—';
+    const type        = PokéEvolution.getStat(attrs, 'Type')   || 'Normal';
+    const rarity      = PokéEvolution.getStat(attrs, 'Rarity') || 'Common';
+    const gifSrc      = PokéEvolution.getGifPath(species);
+    const displayName = sanitize(pkm.nickname || species);
+    const isActive    = listing.status === 'active';
+
+    const card = document.createElement('div');
+    card.className = `mkt-card${isActive ? '' : ' mkt-card-dimmed'}`;
+    card.innerHTML = `
+      <span class="mkt-card-id mkt-id-${colorIdx}">#${pkmIdStr.slice(-6).toUpperCase()}</span>
+      <span class="mkt-status-badge mkt-status-${listing.status}">${listing.status.toUpperCase()}</span>
+      <div class="mkt-card-img-wrap mkt-bg-${colorIdx}">
+        <img class="mkt-card-gif${isActive ? '' : ' mkt-img-dimmed'}" src="${gifSrc}" alt="${displayName}"
+             onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'" />
+      </div>
+      <div class="mkt-card-info">
+        <span class="mkt-card-name">${displayName}</span>
+        <div class="mkt-card-meta">
+          <span class="mkt-card-level">Lv. ${pkm.level || 1}</span>
+          <span class="type-badge type-${type.toLowerCase()} mkt-badge-sm">${type}</span>
+          <span class="stage-badge stage-${(PokéEvolution.SPECIES_STAGE[species]||'base').toLowerCase()} mkt-badge-sm">${rarity}</span>
+        </div>
+        <div class="mkt-card-stats">
+          <span class="mkt-stat">H: <b>${hp}</b></span>
+          <span class="mkt-stat">A: <b>${atk}</b></span>
+          <span class="mkt-stat">D: <b>${def}</b></span>
+          <span class="mkt-stat">S: <b>${spd}</b></span>
+        </div>
+      </div>
+      <div class="mkt-card-footer">
+        <span class="mkt-card-price">${listing.price.toLocaleString()} POKÉ</span>
+        ${isActive
+          ? `<button class="mkt-buy-btn cancel cancel-listing-btn"
+                     data-listing-id="${listing.id}">Delist</button>`
+          : `<span class="mkt-listing-status-txt">${listing.status}</span>`
+        }
+      </div>
     `;
-    card.appendChild(badge);
     grid.appendChild(card);
   }
 
@@ -1265,268 +1651,6 @@ async function loadMyListings(userId) {
     const b = e.target.closest('.cancel-listing-btn');
     if (b) cancelListing(b.dataset.listingId, userId);
   });
-}
-
-/* ============================================================
-   BATTLE PANEL (simulated quick battle)
-   ============================================================ */
-
-let _battleInited = false;
-let _battleState  = null;
-
-async function initBattlePanel(userId) {
-  if (_battleInited) return;
-  _battleInited = true;
-
-  // Tab switching
-  document.querySelectorAll('#battles .battle-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('#battles .battle-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.battle-pane').forEach(p => p.classList.add('hidden'));
-      tab.classList.add('active');
-      document.getElementById('battleTab-' + tab.dataset.tab)?.classList.remove('hidden');
-    });
-  });
-
-  await loadBattleRoster(userId);
-
-  document.getElementById('startBattleBtn')?.addEventListener('click', () => startQuickBattle(userId));
-}
-
-async function loadBattleRoster(userId) {
-  const roster = document.getElementById('battleRoster');
-  if (!roster) return;
-
-  const { data: owned } = await _supabase
-    .from('owned_pokemon')
-    .select('id, species, nickname, level, experience')
-    .eq('user_id', userId)
-    .limit(6);
-
-  if (!owned?.length) {
-    roster.innerHTML = '<p style="color:var(--text-muted)">No Pokémon available.</p>';
-    return;
-  }
-
-  roster.innerHTML = '';
-  for (const row of owned) {
-    const species = row.species || 'Bulbasaur';
-    const meta    = await PokéEvolution.fetchPokemonMeta(species);
-    const attrs   = meta?.attributes || [];
-    const gif     = PokéEvolution.getGifPath(species);
-    const hp      = PokéEvolution.getStat(attrs, 'HP');
-
-    const chip = document.createElement('div');
-    chip.className   = 'roster-chip';
-    chip.dataset.nftId  = row.id;
-    chip.dataset.species= species;
-    chip.dataset.hp     = hp;
-    chip.dataset.level  = row.level || 1;
-    chip.dataset.atk    = PokéEvolution.getStat(attrs, 'ATK');
-    chip.dataset.def    = PokéEvolution.getStat(attrs, 'DEF');
-    // Grab skills
-    for (let i = 1; i <= 4; i++) {
-      chip.dataset['skill'+i+'Name']  = PokéEvolution.getStat(attrs, `Skill ${i} Name`);
-      chip.dataset['skill'+i+'Atk']   = PokéEvolution.getStat(attrs, `Skill ${i} Attack`);
-      chip.dataset['skill'+i+'Eff']   = PokéEvolution.getStat(attrs, `Skill ${i} Effect`);
-    }
-    chip.innerHTML = `
-      <img src="${gif}" class="roster-gif" alt="${sanitize(row.nickname || species)}" />
-      <span class="roster-name">${sanitize(row.nickname || species)}</span>
-      <span class="roster-level">Lv.${row.level || 1}</span>
-    `;
-    chip.addEventListener('click', () => selectBattlePokemon(chip, owned.map(r => r.id).indexOf(row.id)));
-    roster.appendChild(chip);
-  }
-}
-
-function selectBattlePokemon(chip, idx) {
-  document.querySelectorAll('.roster-chip').forEach(c => c.classList.remove('selected'));
-  chip.classList.add('selected');
-
-  const slot  = document.getElementById('playerSlot');
-  const hpBar = document.getElementById('playerHpBar');
-  const hpTxt = document.getElementById('playerHpText');
-  const gif   = PokéEvolution.getGifPath(chip.dataset.species);
-
-  slot.innerHTML = `
-    <img src="${gif}" class="battle-gif battle-gif-player"
-         alt="${sanitize(chip.dataset.species)}" />
-    <span class="battle-pokemon-name">${sanitize(chip.dataset.species)}</span>
-    <span class="battle-pokemon-level">Lv. ${chip.dataset.level}</span>
-  `;
-
-  const hp = parseInt(chip.dataset.hp) || 100;
-  hpBar.style.width = '100%';
-  hpTxt.textContent = `${hp} / ${hp} HP`;
-
-  document.getElementById('startBattleBtn').disabled = false;
-
-  _battleState = {
-    playerSpecies: chip.dataset.species,
-    playerHp:      hp, playerMaxHp: hp,
-    playerAtk:     parseInt(chip.dataset.atk) || 50,
-    playerDef:     parseInt(chip.dataset.def) || 50,
-    skills: [
-      { name: chip.dataset.skill1Name, atk: parseInt(chip.dataset.skill1Atk)||40, eff: chip.dataset.skill1Eff },
-      { name: chip.dataset.skill2Name, atk: parseInt(chip.dataset.skill2Atk)||50, eff: chip.dataset.skill2Eff },
-      { name: chip.dataset.skill3Name, atk: parseInt(chip.dataset.skill3Atk)||30, eff: chip.dataset.skill3Eff },
-      { name: chip.dataset.skill4Name, atk: parseInt(chip.dataset.skill4Atk)||60, eff: chip.dataset.skill4Eff },
-    ],
-  };
-}
-
-// Simple random opponent selection from the metadata pool
-const OPPONENT_POOL = [
-  'Charmander','Squirtle','Bulbasaur','Pikachu','Eevee',
-  'Pidgey','Ghastly','Dratini','Machop','Horsea',
-];
-
-async function startQuickBattle(userId) {
-  if (!_battleState) return;
-  const startBtn = document.getElementById('startBattleBtn');
-  startBtn.disabled = true;
-  startBtn.textContent = '⏳ Searching...';
-
-  const oppSpecies = OPPONENT_POOL[Math.floor(Math.random() * OPPONENT_POOL.length)];
-  const oppMeta    = await PokéEvolution.fetchPokemonMeta(oppSpecies);
-  const oppAttrs   = oppMeta?.attributes || [];
-  const oppHpMax   = PokéEvolution.getStat(oppAttrs, 'HP') || 180;
-  const oppAtk     = PokéEvolution.getStat(oppAttrs, 'ATK') || 45;
-  const oppDef     = PokéEvolution.getStat(oppAttrs, 'DEF') || 45;
-  const oppGif     = PokéEvolution.getGifPath(oppSpecies);
-
-  document.getElementById('opponentSlot').innerHTML = `
-    <img src="${oppGif}" class="battle-gif battle-gif-opp" alt="${sanitize(oppSpecies)}" />
-    <span class="battle-pokemon-name">${sanitize(oppSpecies)}</span>
-  `;
-  const oppHpBar = document.getElementById('opponentHpBar');
-  const oppHpTxt = document.getElementById('opponentHpText');
-  oppHpBar.style.width = '100%';
-  oppHpTxt.textContent = `${oppHpMax} / ${oppHpMax} HP`;
-
-  let oppHp = oppHpMax;
-  let plHp  = _battleState.playerHp;
-  const plHpBar = document.getElementById('playerHpBar');
-  const plHpTxt = document.getElementById('playerHpText');
-
-  const log = document.getElementById('battleLog');
-  log.innerHTML = '<p class="log-entry">Battle started! Choose your skill!</p>';
-
-  // Show skills
-  const skillsDiv = document.getElementById('battleSkills');
-  skillsDiv.classList.remove('hidden');
-  _battleState.skills.forEach((skill, i) => {
-    const btn = document.getElementById(`skill${i+1}Btn`);
-    if (btn) {
-      btn.textContent = skill.name ? `⚡ ${skill.name} (${skill.atk})` : `Attack ${i+1}`;
-      btn.onclick = () => doPlayerTurn(skill, i);
-    }
-  });
-
-  startBtn.textContent = '⚔️ Battle in progress...';
-
-  function logEntry(msg) {
-    const p = document.createElement('p');
-    p.className = 'log-entry';
-    p.textContent = msg;
-    log.appendChild(p);
-    log.scrollTop = log.scrollHeight;
-  }
-
-  function updateBars() {
-    const pPct = Math.max(0, (plHp  / _battleState.playerMaxHp)  * 100);
-    const oPct = Math.max(0, (oppHp / oppHpMax) * 100);
-    plHpBar.style.width  = pPct  + '%';
-    oppHpBar.style.width = oPct  + '%';
-    plHpTxt.textContent  = `${Math.max(0,plHp)}  / ${_battleState.playerMaxHp} HP`;
-    oppHpTxt.textContent = `${Math.max(0,oppHp)} / ${oppHpMax} HP`;
-  }
-
-  function disableSkills() {
-    skillsDiv.querySelectorAll('.skill-btn').forEach(b => { b.disabled = true; });
-  }
-  function enableSkills() {
-    skillsDiv.querySelectorAll('.skill-btn').forEach(b => { b.disabled = false; });
-  }
-
-  async function doPlayerTurn(skill) {
-    disableSkills();
-
-    // Player attacks
-    const pDmg = Math.max(1, Math.round(skill.atk * (100 / (100 + oppDef)) * (0.85 + Math.random() * 0.3)));
-    oppHp -= pDmg;
-    logEntry(`${_battleState.playerSpecies} used ${skill.name}! Dealt ${pDmg} damage.`);
-    updateBars();
-
-    if (oppHp <= 0) {
-      await endBattle(true, userId);
-      return;
-    }
-
-    // Small delay then opponent attacks
-    await new Promise(r => setTimeout(r, 800));
-
-    const oppSkillAtk = PokéEvolution.getStat(oppAttrs, 'Skill 1 Attack') || oppAtk;
-    const oDmg = Math.max(1, Math.round(oppSkillAtk * (100 / (100 + _battleState.playerDef)) * (0.85 + Math.random() * 0.3)));
-    plHp -= oDmg;
-    logEntry(`${oppSpecies} counter-attacked! Dealt ${oDmg} damage.`);
-    updateBars();
-
-    if (plHp <= 0) {
-      await endBattle(false, userId);
-      return;
-    }
-
-    enableSkills();
-  }
-
-  async function endBattle(playerWon, userId) {
-    disableSkills();
-    skillsDiv.classList.add('hidden');
-
-    const xpGained = playerWon ? 120 : 30;
-    const pokeGain = playerWon ? Math.floor(Math.random() * 50) + 20 : 0;
-
-    logEntry(playerWon
-      ? `🏆 You won! +${xpGained} XP, +${pokeGain} POKÉ earned!`
-      : `💀 You lost! +${xpGained} XP for effort.`);
-
-    // Update Supabase stats + XP
-    try {
-      const { data: t } = await _supabase.from('trainer_profiles').select('token_balance,battles_fought,battles_won,total_earned').eq('user_id', userId).single();
-      if (t) {
-        await _supabase.from('trainer_profiles').update({
-          battles_fought: (t.battles_fought || 0) + 1,
-          battles_won:    (t.battles_won    || 0) + (playerWon ? 1 : 0),
-          token_balance:  (t.token_balance  || 0) + pokeGain,
-          total_earned:   (t.total_earned   || 0) + pokeGain,
-        }).eq('user_id', userId);
-
-        // Refresh token display
-        document.getElementById('tokenBalance').textContent = ((t.token_balance || 0) + pokeGain).toLocaleString();
-        document.getElementById('walletBalance').textContent = `${((t.token_balance || 0) + pokeGain).toLocaleString()} POKÉ`;
-      }
-
-      // Award + check evolution
-      if (_battleState.nftId) {
-        const { data: pkm } = await _supabase.from('owned_pokemon').select('experience, level, species').eq('id', _battleState.nftId).single();
-        if (pkm) {
-          const newXp  = (pkm.experience || 0) + xpGained;
-          const newLvl = Math.min(100, pkm.level + Math.floor(newXp / 1000));
-          await _supabase.from('owned_pokemon').update({ experience: newXp % 1000, level: newLvl }).eq('id', _battleState.nftId);
-
-          const { canEvolve, evolvesTo } = PokéEvolution.checkEvolution(pkm.species, newLvl);
-          if (canEvolve) showToast(`✨ ${pkm.species} is ready to evolve into ${evolvesTo}! Visit My Pokémon.`, 'success', 6000);
-        }
-      }
-
-    } catch (_) {}
-
-    startBtn.disabled  = false;
-    startBtn.textContent = '⚔️ Battle Again';
-    startBtn.onclick   = () => startQuickBattle(userId);
-  }
 }
 
 /* ============================================================
@@ -1577,14 +1701,25 @@ function showToast(message, type = 'info', duration = 4000) {
   const userId = session.user.id;
 
   initMobileSidebar();
-  await loadProfile(session);
-  await loadStarterPokemon(userId);
+
+  try { await loadProfile(session); }
+  catch (e) { console.error('[init] loadProfile failed:', e); }
+
+  try { await loadStarterPokemon(userId); }
+  catch (e) { console.error('[init] loadStarterPokemon failed:', e); }
+
   initSidebarNav(userId);
   initProfileForm(userId);
   initPasswordForm();
   initDeleteAccount(userId);
   initWaitlistButtons(userId);
   initWalletPanel();
+
+  // Pokémon detail modal — close on button or backdrop click
+  const _pdm = document.getElementById('pokeDetailModal');
+  document.getElementById('pokeDetailClose')?.addEventListener('click', () => _pdm?.classList.add('hidden'));
+  _pdm?.addEventListener('click', (e) => { if (e.target === _pdm) _pdm.classList.add('hidden'); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _pdm?.classList.add('hidden'); });
 
   // The 'restored' wallet event fires before initWalletPanel() registers
   // its listener (wallet.js boots before dashboard.js init runs).

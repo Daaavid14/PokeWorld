@@ -1042,6 +1042,13 @@ input, select, textarea { font-family: inherit; }
 }
 .form-group input.field-invalid { border-color: var(--clr-red); }
 .form-group input.field-valid   { border-color: var(--clr-green); }
+.form-group input:disabled {
+  color: var(--text-secondary);
+  opacity: 1;
+  cursor: not-allowed;
+  border-color: var(--clr-border);
+  -webkit-text-fill-color: var(--text-secondary);
+}
 
 .password-wrap { position: relative; }
 .password-wrap input { width: 100%; padding-right: 44px; }
@@ -1184,6 +1191,18 @@ input, select, textarea { font-family: inherit; }
 }
 .toast-close:hover { opacity: 1; }
 .toast.fade-out { animation: slideOutRight 0.3s ease forwards; }
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+/* Span full grid width for status / error messages */
+.grid-status-msg {
+  color: var(--text-secondary);
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 40px 0;
+}
 
 /* ============================================================
    RESPONSIVE DESIGN

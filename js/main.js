@@ -286,7 +286,7 @@ async function loadShowcaseCards() {
     initScrollReveal();
   } catch (err) {
     console.error('[Showcase] Error loading cards:', err);
-    grid.innerHTML = `<p style="color:var(--text-secondary); text-align:center; grid-column: 1/-1;">
+    grid.innerHTML = `<p class="grid-status-msg">
       Failed to load Pokémon. Check your connection.
     </p>`;
   }
@@ -299,9 +299,9 @@ function renderCards(pokemons, grid) {
   grid.innerHTML = '';
 
   if (!pokemons.length) {
-    grid.innerHTML = `<p style="color:var(--text-secondary); text-align:center; grid-column:1/-1; padding: 40px 0;">
+    grid.innerHTML = `<p class="grid-status-msg">
       No Pokémon found for this type. Try another filter!
-    </p>`;
+    </p>`;;
     return;
   }
 

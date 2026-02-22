@@ -73,6 +73,14 @@
     {
       "source": "/reset-password",
       "destination": "/reset-password.html"
+    },
+    {
+      "source": "/battle",
+      "destination": "/battle.html"
+    },
+    {
+      "source": "/game",
+      "destination": "/game.html"
     }
   ],
   "redirects": [

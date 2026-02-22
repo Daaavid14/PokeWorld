@@ -2,7 +2,6 @@
    DASHBOARD STYLES — PokéWorld
    ============================================================ */
 
-/* ---- Layout ---- */
 .dashboard-body {
   background: var(--clr-bg);
   min-height: 100vh;
@@ -13,7 +12,6 @@
   min-height: 100vh;
 }
 
-/* ---- Sidebar ---- */
 .sidebar {
   width: 260px;
   background: var(--clr-bg-3);
@@ -92,6 +90,8 @@
   color: var(--text-secondary);
   transition: all 0.2s ease;
   position: relative;
+  cursor: pointer;
+  text-decoration: none;
 }
 .sidebar-link::before {
   content: '';
@@ -121,7 +121,6 @@
   justify-content: center;
 }
 
-/* ---- Main ---- */
 .dashboard-main {
   flex: 1;
   margin-left: 260px;
@@ -131,14 +130,13 @@
   background: var(--clr-bg);
 }
 
-/* ---- Top Bar ---- */
 .dash-topbar {
   height: 64px;
   background: var(--clr-bg-3);
   border-bottom: 1px solid var(--clr-border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0 var(--space-lg);
   position: sticky;
   top: 0;
@@ -155,24 +153,75 @@
 .token-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255,213,0,0.1);
-  border: 1px solid rgba(255,213,0,0.3);
-  padding: 6px 14px;
+  gap: 7px;
+  background: rgba(255,213,0,0.08);
+  border: 1px solid rgba(255,213,0,0.35);
+  padding: 6px 16px 6px 8px;
   border-radius: var(--radius-pill);
   font-family: var(--font-display);
   font-size: 0.8rem;
   color: var(--clr-yellow);
   font-weight: 700;
+  white-space: nowrap;
 }
-.token-icon { width: 16px; height: 16px; }
-.topbar-username {
+.token-coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: var(--clr-yellow);
+  color: #0d0d1a;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.65rem;
   font-family: var(--font-display);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
-/* ---- Panels ---- */
+.topbar-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-pill);
+  padding: 5px 16px 5px 6px;
+  cursor: default;
+}
+.topbar-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #2a1b5e;
+  border: 2px solid var(--clr-yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.topbar-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.2;
+}
+.topbar-username {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.topbar-rank {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  color: var(--clr-cyan);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .dash-panel {
   flex: 1;
   padding: var(--space-xl);
@@ -188,7 +237,6 @@
   margin-bottom: var(--space-xl);
 }
 
-/* ---- Overview Stats ---- */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -221,7 +269,6 @@
 }
 .stat-lbl { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
 
-/* ---- Overview Sections ---- */
 .overview-section { margin-bottom: var(--space-xl); }
 .overview-section-title {
   font-family: var(--font-display);
@@ -236,12 +283,11 @@
 
 .starter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--space-md);
-  max-width: 700px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 14px;
+  max-width: 600px;
 }
 
-/* ---- Activity List ---- */
 .activity-list {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
@@ -268,7 +314,6 @@
   font-size: 0.9rem;
 }
 
-/* ---- Panel Toolbar ---- */
 .panel-toolbar {
   display: flex;
   gap: var(--space-md);
@@ -301,7 +346,6 @@
 }
 .filter-select:focus { border-color: var(--clr-yellow); }
 
-/* ---- Coming Soon Panel ---- */
 .coming-soon-panel {
   display: flex;
   flex-direction: column;
@@ -327,7 +371,6 @@
   margin-bottom: var(--space-lg);
 }
 
-/* ---- Wallet ---- */
 .wallet-card {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
@@ -365,7 +408,6 @@
   margin-bottom: var(--space-md);
 }
 
-/* ---- Settings ---- */
 .settings-card {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
@@ -387,7 +429,6 @@
 .danger-title { color: var(--clr-red); }
 .settings-danger p { color: var(--text-secondary); margin-bottom: var(--space-lg); font-size: 0.9rem; }
 
-/* Delete Modal */
 #deleteModal .modal-actions {
   display: flex;
   gap: var(--space-sm);
@@ -843,38 +884,235 @@
 .market-pane { display: block; }
 .market-pane.hidden { display: none; }
 
-.market-overlay {
-  padding: 10px 14px;
-  border-top: 1px solid var(--clr-border);
+/* ── Axie-style market grid ──────────────────────────────── */
+#marketGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 14px;
+  margin-top: 1rem;
+}
+
+/* ── Individual market card ─────────────────────────────── */
+.mkt-card {
+  position: relative;
+  background: #1a1a38;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+}
+.mkt-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+  border-color: rgba(255,255,255,0.18);
+}
+.mkt-card-dimmed {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.mkt-card-dimmed:hover { transform: none; box-shadow: none; }
+
+/* Coloured ID tag */
+.mkt-card-id {
+  position: absolute;
+  top: 8px; left: 8px;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  z-index: 2;
+  letter-spacing: 0.04em;
+}
+
+/* Own-listing ribbon */
+.mkt-card-own-badge {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(255,210,50,0.2);
+  border: 1px solid rgba(255,210,50,0.5);
+  color: #ffd500;
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  z-index: 2;
+}
+
+/* Sprite area */
+.mkt-card-img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 0.85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(124,58,237,0.22) 0%, transparent 70%);
+  padding: 12px 8px 6px;
+}
+.mkt-card-gif {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6));
+}
+
+/* Info area */
+.mkt-card-info {
+  padding: 6px 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mkt-card-name {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mkt-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.mkt-card-level {
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.45);
+  font-weight: 600;
+}
+
+/* Compact stats row */
+.mkt-card-stats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.38);
+  margin-top: 1px;
+}
+.mkt-stat { display: flex; align-items: center; gap: 2px; }
+.mkt-stat b { color: rgba(255,255,255,0.72); font-weight: 700; }
+
+/* Price footer */
+.mkt-card-footer {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
-.market-price {
+.mkt-card-price {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
   font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--clr-yellow);
+  color: #ffd500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
-.buy-btn, .cancel-listing-btn {
-  font-size: 0.75rem !important;
-  padding: 5px 12px !important;
+.mkt-card-price::before { content: '≡'; font-size: 0.85rem; }
+
+.mkt-buy-btn {
+  background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: filter 0.15s, transform 0.15s;
+  white-space: nowrap;
 }
-.selected-for-sale { border-color: var(--clr-yellow) !important; }
+.mkt-buy-btn:hover { filter: brightness(1.2); transform: scale(1.04); }
+.mkt-buy-btn.cancel { background: linear-gradient(135deg, #7f1d1d, #b91c1c); }
+
+/* XP progress bar inside My Pokémon cards */
+.mkt-xp-bar {
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.mkt-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6d28d9, #a78bfa);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* My Pokémon grid — same Axie-style layout as marketplace */
+#myPokemonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 14px;
+}
+
+/* ID tag colour palette (cycles by index) */
+.mkt-id-0 { background: #c026d3; color: #fff; }
+.mkt-id-1 { background: #16a34a; color: #fff; }
+.mkt-id-2 { background: #d97706; color: #fff; }
+.mkt-id-3 { background: #2563eb; color: #fff; }
+.mkt-id-4 { background: #db2777; color: #fff; }
+.mkt-id-5 { background: #0891b2; color: #fff; }
+
+/* Sprite background tint (cycles by index) */
+.mkt-bg-0 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(192,38,211,0.22) 0%, transparent 70%); }
+.mkt-bg-1 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(22,163,74,0.22) 0%, transparent 70%); }
+.mkt-bg-2 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(217,119,6,0.22) 0%, transparent 70%); }
+.mkt-bg-3 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(37,99,235,0.22) 0%, transparent 70%); }
+.mkt-bg-4 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(219,39,119,0.22) 0%, transparent 70%); }
+.mkt-bg-5 { background: radial-gradient(ellipse 80% 70% at 50% 60%, rgba(8,145,178,0.22) 0%, transparent 70%); }
+
+.selected-for-sale {
+  border-color: var(--clr-yellow) !important;
+  box-shadow: 0 0 0 2px rgba(255,213,0,0.4) !important;
+}
 
 /* Sell panel */
-.sell-wrapper { max-width: 700px; }
-.sell-title { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: var(--space-sm); }
+.sell-wrapper { max-width: 100%; }
+.sell-title { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: var(--space-sm); margin-top: 1.5rem; }
 .sell-hint { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: var(--space-lg); }
-.sell-picker {
+
+/* Sell picker & My Listings use the same Axie-style grid as Buy P2P */
+.sell-picker,
+#myListingsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
-  gap: 12px;
-  max-height: 380px;
-  overflow-y: auto;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 14px;
   margin-bottom: var(--space-lg);
 }
+
+/* My-listings status overlay on the mkt-card footer */
+.mkt-status-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.mkt-status-active     { background: rgba(0,230,118,0.18); color: #00e676; }
+.mkt-status-sold       { background: rgba(33,150,243,0.18); color: #64b5f6; }
+.mkt-status-cancelled  { background: rgba(150,150,150,0.18); color: #999; }
 .sell-form {
   background: var(--clr-bg-3);
   border: 1px solid var(--clr-border);
@@ -906,6 +1144,7 @@
 
 /* ---- Shop (Mint) ---- */
 .shop-header { margin-bottom: 1rem; }
+#marketTab-mint .panel-toolbar { margin-bottom: 1rem; }
 
 .shop-pack-banner {
   display: flex;
@@ -916,6 +1155,7 @@
   border-radius: 12px;
   padding: 1rem 1.5rem;
   margin-top: 0.75rem;
+  margin-bottom: 1.25rem;
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -948,7 +1188,47 @@
 /* shop grid uses tighter columns than the default 220px */
 #shopGrid {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  margin-top: 0;
 }
+
+/* ============================================================
+   UTILITY CLASSES — replaces inline styles in JS templates
+   ============================================================ */
+
+/* Mini-size for type/stage badges inside mkt-card */
+.mkt-badge-sm { font-size: 0.55rem; padding: 1px 6px; }
+
+/* Centered card footer */
+.mkt-card-footer.mkt-footer-center { justify-content: center; }
+
+/* Evolve button — purple gradient */
+.evolve-btn {
+  background: linear-gradient(135deg, #7b2ff7, #e040fb);
+  padding: 4px 12px;
+}
+
+/* XP hint text shown when pokemon cannot yet evolve */
+.mkt-xp-hint { font-size: 0.6rem; color: rgba(255,255,255,0.25); }
+
+/* Error/empty paragraph inside pokemon grids */
+.poke-load-error { color: var(--text-muted); }
+
+/* Sell picker — select button */
+.mkt-select-btn {
+  background: linear-gradient(135deg, #1e3a5f, #2a5f9e);
+  cursor: pointer;
+  padding: 4px 16px;
+}
+
+/* Detail modal loading / no-data states */
+.poke-loading-text { color: var(--text-muted); font-size: 0.8rem; }
+.skill-empty-text  { color: rgba(255,255,255,0.3); font-size: 0.8rem; }
+
+/* My Listings — sold/cancelled status text */
+.mkt-listing-status-txt { font-size: 0.62rem; color: rgba(255,255,255,0.3); }
+
+/* My Listings — image overlay for non-active listings */
+.mkt-img-dimmed { opacity: 0.5; filter: grayscale(60%); }
 
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
@@ -1025,3 +1305,299 @@
 .shop-card {
   position: relative;
 }
+
+/* ================================================================
+   POKÉMON DETAIL MODAL  —  Axie-inspired layout
+   ================================================================ */
+
+.poke-detail-modal {
+  max-width: 720px;
+  width: 95vw;
+  padding: 0;
+  overflow: hidden;
+  background: #161630;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.2);
+}
+
+/* ── Header band ────────────────────────────────────────────── */
+.poke-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: linear-gradient(100deg, #2a1060 0%, #3b1f8c 50%, #1e1060 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-wrap: wrap;
+}
+
+.poke-detail-back {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #c0b8ff;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.poke-detail-back:hover { background: rgba(255,255,255,0.16); color: #fff; }
+
+.poke-detail-title-group { flex: 1; min-width: 0; }
+
+.poke-detail-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poke-detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.poke-detail-level-pill {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: #e0d9ff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Body (two columns) ─────────────────────────────────────── */
+.poke-detail-layout {
+  display: grid;
+  grid-template-columns: 215px 1fr;
+}
+
+/* ── Left column ────────────────────────────────────────────── */
+.poke-detail-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.5rem 1rem 1.25rem;
+  background: linear-gradient(180deg, #1a1240 0%, #110e2e 100%);
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Character platform with purple glow */
+.poke-detail-stage-platform {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 165px;
+  height: 165px;
+  background: radial-gradient(ellipse 70% 60% at 50% 58%, rgba(124,58,237,0.38) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.poke-detail-stage-platform::after {
+  content: '';
+  position: absolute;
+  bottom: 6px; left: 50%; transform: translateX(-50%);
+  width: 90px; height: 14px;
+  background: radial-gradient(ellipse, rgba(124,58,237,0.45) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.poke-detail-gif {
+  width: 145px;
+  height: 145px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 10px 22px rgba(124,58,237,0.65));
+}
+
+/* XP bar */
+.poke-detail-xp {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.38);
+  text-align: center;
+}
+.poke-detail-xp .xp-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.poke-detail-xp .xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ── Stat tiles 2×2 ─────────────────────────────────────────── */
+.poke-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 10px;
+  padding: 10px 6px 8px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-tile::before {          /* coloured top stripe */
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  border-radius: 10px 10px 0 0;
+}
+.stat-hp  { background: rgba(255,77,100,0.15); }
+.stat-hp::before  { background: #ff4d64; }
+.stat-atk { background: rgba(255,160,50,0.15); }
+.stat-atk::before { background: #ffa032; }
+.stat-def { background: rgba(50,130,255,0.15); }
+.stat-def::before { background: #3282ff; }
+.stat-spd { background: rgba(0,220,130,0.15); }
+.stat-spd::before { background: #00dc82; }
+
+.stat-tile-val {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.stat-tile-lbl {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.42);
+  font-weight: 600;
+}
+
+/* ── Right column ───────────────────────────────────────────── */
+.poke-detail-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.25rem;
+  background: #161630;
+  overflow-y: auto;
+  max-height: 450px;
+}
+
+.poke-detail-section-title {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.3);
+  margin: 0;
+}
+
+/* ── Skill cards 2×2 grid ───────────────────────────────────── */
+.poke-detail-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+}
+
+.skill-card {
+  border-radius: 12px;
+  padding: 0.9rem 0.85rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: default;
+}
+.skill-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+
+.skill-card:nth-child(1) { background: linear-gradient(135deg,#2d1b6e,#4a2a9e); border: 1px solid rgba(124,58,237,0.45); }
+.skill-card:nth-child(2) { background: linear-gradient(135deg,#1e3a5f,#2a5f9e); border: 1px solid rgba(50,130,255,0.45); }
+.skill-card:nth-child(3) { background: linear-gradient(135deg,#3d1a1a,#7a2828); border: 1px solid rgba(255,77,100,0.45); }
+.skill-card:nth-child(4) { background: linear-gradient(135deg,#1a3d22,#2a7a3c); border: 1px solid rgba(0,220,130,0.45); }
+
+.skill-card-name {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.skill-card-power {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffd500;
+  line-height: 1;
+}
+.skill-card-power::before { content: '⚡'; font-size: 0.82rem; }
+.skill-card-effect {
+  font-size: 0.66rem;
+  color: rgba(255,255,255,0.48);
+  font-style: italic;
+  line-height: 1.35;
+}
+
+/* ── Evolution line ─────────────────────────────────────────── */
+.poke-detail-evo {
+  margin-top: auto;
+  padding: 0.6rem 0.8rem;
+  background: rgba(124,58,237,0.12);
+  border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #c4b5fd;
+  text-align: center;
+}
+
+/* Card click cursor */
+.nft-card.clickable { cursor: pointer; }
+.nft-card.clickable:hover { box-shadow: 0 0 0 2px var(--clr-cyan, #00e5ff); }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .poke-detail-layout      { grid-template-columns: 1fr; }
+  .poke-detail-left        { flex-direction: row; align-items: flex-start; gap: 1rem;
+                             border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .poke-detail-stage-platform { width: 110px; height: 110px; flex-shrink: 0; }
+  .poke-detail-gif         { width: 100px; height: 100px; }
+  .poke-detail-stats       { grid-template-columns: repeat(4,1fr); }
+  .poke-detail-right       { max-height: none; }
+}
+

@@ -153,6 +153,18 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'owned_pokemon_select_own' AND tablename = 'owned_pokemon') THEN
     CREATE POLICY "owned_pokemon_select_own" ON public.owned_pokemon FOR SELECT USING (auth.uid() = user_id);
   END IF;
+  -- Allow any authenticated user to view a Pokémon that has an active market listing
+  -- (needed so Buy P2P can display other trainers' listed Pokémon)
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'owned_pokemon_select_marketplace' AND tablename = 'owned_pokemon') THEN
+    CREATE POLICY "owned_pokemon_select_marketplace" ON public.owned_pokemon
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1 FROM public.market_listings ml
+          WHERE ml.pokemon_id = owned_pokemon.id
+            AND ml.status = 'active'
+        )
+      );
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'owned_pokemon_insert_own' AND tablename = 'owned_pokemon') THEN
     CREATE POLICY "owned_pokemon_insert_own" ON public.owned_pokemon FOR INSERT WITH CHECK (auth.uid() = user_id);
   END IF;
@@ -292,3 +304,34 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.owned_pokemon     TO authenticate
 GRANT INSERT                         ON public.waitlist          TO anon, authenticated;
 GRANT SELECT, INSERT                 ON public.feature_waitlist  TO authenticated;
 -- market_listings grants are above
+
+-- ============================================================
+-- BATTLE RESULTS TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.battle_results (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  outcome      TEXT NOT NULL CHECK (outcome IN ('win','loss','draw')),
+  poke_earned  INTEGER NOT NULL DEFAULT 0,
+  xp_earned    INTEGER NOT NULL DEFAULT 0,
+  team_used    JSONB,
+  played_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS battle_results_user_idx ON public.battle_results(user_id);
+CREATE INDEX IF NOT EXISTS battle_results_played_idx ON public.battle_results(played_at DESC);
+
+-- Enable RLS
+ALTER TABLE public.battle_results ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Users read own battle results"
+  ON public.battle_results FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users insert own battle results"
+  ON public.battle_results FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Grants
+GRANT SELECT, INSERT ON public.battle_results TO authenticated;

@@ -177,7 +177,7 @@ function getMetaPath(speciesName) {
  */
 async function fetchPokemonMeta(speciesName) {
   try {
-    const res = await fetch(getMetaPath(speciesName));
+    const res = await fetch(getMetaPath(speciesName), { cache: 'no-cache' });
     if (!res.ok) return null;
     return await res.json();
   } catch {

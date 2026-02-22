@@ -13,11 +13,12 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Fredoka+One&display=swap" rel="stylesheet" />
   <link rel="icon" href="/assets/pokeball.svg" type="image/x-icon" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/dashboard.css" />
+  <link rel="stylesheet" href="/css/battle.css" />
 </head>
 <body class="dashboard-body">
 
@@ -35,24 +36,24 @@
       </div>
 
       <!-- User Profile Snippet -->
-      <div class="sidebar-profile" id="sidebarProfile" aria-label="Trainer Profile">
+      <!-- <div class="sidebar-profile" id="sidebarProfile" aria-label="Trainer Profile">
         <div class="profile-avatar" id="profileAvatar" aria-hidden="true">🎮</div>
         <div class="profile-info">
           <span class="profile-name" id="profileName">Loading...</span>
           <span class="profile-rank" id="profileRank">Rookie Trainer</span>
         </div>
-      </div>
+      </div> -->
 
       <nav class="sidebar-nav">
         <ul role="list">
           <li><a href="#overview" class="sidebar-link active" data-panel="overview">
             <span class="link-icon" aria-hidden="true">📊</span> Overview
           </a></li>
-          <li><a href="#my-pokemon" class="sidebar-link" data-panel="my-pokemon">
-            <span class="link-icon" aria-hidden="true">🎴</span> My Pokémon
+          <li><a href="/game.html" class="sidebar-link" target="_blank" rel="noopener">
+            <span class="link-icon" aria-hidden="true">⚔️</span> Game
           </a></li>
-          <li><a href="#battles" class="sidebar-link" data-panel="battles">
-            <span class="link-icon" aria-hidden="true">⚔️</span> Battles
+          <li><a href="#inventory" class="sidebar-link" data-panel="my-pokemon">
+            <span class="link-icon" aria-hidden="true">🎴</span> Inventory
           </a></li>
           <li><a href="#marketplace" class="sidebar-link" data-panel="marketplace">
             <span class="link-icon" aria-hidden="true">🛒</span> Marketplace
@@ -84,10 +85,16 @@
         </button>
         <div class="topbar-right">
           <span class="token-badge" aria-label="POKÉ Token Balance">
-            <img src="/assets/poke-token.svg" alt="" aria-hidden="true" class="token-icon" />
-            <span id="tokenBalance">0</span> POKÉ
+            <span class="token-coin" aria-hidden="true">P</span>
+            <span id="tokenBalance">0</span>&nbsp;POKÉ
           </span>
-          <span class="topbar-username" id="topbarUsername">Trainer</span>
+          <div class="topbar-profile">
+            <div class="topbar-avatar" aria-hidden="true">🎮</div>
+            <div class="topbar-profile-info">
+              <span class="topbar-username" id="topbarUsername">Trainer</span>
+              <span class="topbar-rank" id="topbarRank">Rookie Trainer</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -168,88 +175,7 @@
         </div>
       </section>
 
-      <!-- ---- PANEL: BATTLES ---- -->
-      <section class="dash-panel hidden" id="battles" aria-labelledby="battlesTitle">
-        <h1 class="dash-title" id="battlesTitle">Battle Arena ⚔️</h1>
-
-        <!-- Battle mode tabs -->
-        <div class="battle-tabs" role="tablist">
-          <button class="battle-tab active" data-tab="quick">Quick Battle</button>
-          <button class="battle-tab" data-tab="ranked">Ranked</button>
-          <button class="battle-tab" data-tab="history">History</button>
-        </div>
-
-        <!-- Quick Battle -->
-        <div class="battle-pane" id="battleTab-quick">
-          <div class="battle-arena-wrap">
-
-            <!-- Opponent side -->
-            <div class="battle-side opponent-side">
-              <h3 class="side-label">Opponent</h3>
-              <div class="battle-pokemon-slot" id="opponentSlot">
-                <div class="slot-empty">Searching for opponent...</div>
-              </div>
-              <div class="battle-hp-wrap" id="opponentHp">
-                <div class="hp-bar-track"><div class="hp-bar-fill" id="opponentHpBar" style="width:100%"></div></div>
-                <span class="hp-text" id="opponentHpText">— HP</span>
-              </div>
-            </div>
-
-            <!-- VS divider -->
-            <div class="vs-divider" aria-hidden="true">VS</div>
-
-            <!-- Player side -->
-            <div class="battle-side player-side">
-              <h3 class="side-label">Your Pokémon</h3>
-              <div class="battle-pokemon-slot" id="playerSlot">
-                <div class="slot-empty">Select a Pokémon below ↓</div>
-              </div>
-              <div class="battle-hp-wrap" id="playerHp">
-                <div class="hp-bar-track"><div class="hp-bar-fill player-hp" id="playerHpBar" style="width:100%"></div></div>
-                <span class="hp-text" id="playerHpText">— HP</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Skill buttons (shown during battle) -->
-          <div class="battle-skills hidden" id="battleSkills">
-            <button class="skill-btn" id="skill1Btn"></button>
-            <button class="skill-btn" id="skill2Btn"></button>
-            <button class="skill-btn" id="skill3Btn"></button>
-            <button class="skill-btn" id="skill4Btn"></button>
-          </div>
-
-          <!-- Battle log -->
-          <div class="battle-log" id="battleLog" aria-live="polite">
-            <p class="log-entry">Choose your Pokémon to start a battle!</p>
-          </div>
-
-          <!-- Team selector -->
-          <div class="battle-team-select">
-            <h3 class="team-select-title">Select Your Fighter</h3>
-            <div class="battle-roster" id="battleRoster"></div>
-          </div>
-
-          <button class="btn btn-primary btn-lg" id="startBattleBtn" disabled>⚔️ Find Opponent</button>
-        </div>
-
-        <!-- Ranked (waitlist) -->
-        <div class="battle-pane hidden" id="battleTab-ranked">
-          <div class="coming-soon-panel">
-            <div class="cs-icon">🏆</div>
-            <h2>Ranked Battles</h2>
-            <p>Competitive ranked matchmaking launches <strong>Q2 2026</strong>. Join early to reserve your rank slot!</p>
-            <button class="btn btn-primary" id="battlesWaitlistBtn">Join Ranked Waitlist</button>
-          </div>
-        </div>
-
-        <!-- History -->
-        <div class="battle-pane hidden" id="battleTab-history">
-          <div class="battle-history-list" id="battleHistoryList">
-            <div class="activity-empty">No battles fought yet. Start your first battle!</div>
-          </div>
-        </div>
-      </section>
+      <!-- Game panel removed — lobby now opens in /game.html (new tab) -->
 
       <!-- ---- PANEL: MARKETPLACE ---- -->
       <section class="dash-panel hidden" id="marketplace" aria-labelledby="marketplaceTitle">
@@ -259,7 +185,7 @@
         <div class="battle-tabs" role="tablist">
           <button class="battle-tab" data-tab="shop" data-admin-only="true">🏪 Shop</button>
           <button class="battle-tab active" data-tab="buy">🛒 Buy P2P</button>
-          <button class="battle-tab" data-tab="sell" data-admin-only="true">📦 Sell / List</button>
+          <button class="battle-tab" data-tab="sell">📦 Sell / List</button>
           <button class="battle-tab" data-tab="my-listings">📋 My Listings</button>
         </div>
 
@@ -275,20 +201,10 @@
           </div>
           <div class="shop-header">
             <p class="sell-hint">Mint new base Pokémon NFTs directly to your wallet. Prices are in POKÉ tokens.</p>
-            <div class="shop-pack-banner">
-              <div class="pack-info">
-                <span class="pack-icon">🎁</span>
-                <div>
-                  <strong>Random Pack</strong>
-                  <span class="pack-sub">3 random base Pokémon — 250 POKÉ</span>
-                </div>
-              </div>
-              <button class="btn btn-primary" id="buyPackBtn">Buy Random Pack</button>
-            </div>
           </div>
 
-          <h3 class="sell-title" style="margin-top:1.5rem">Pick Your Pokémon — 100 POKÉ each</h3>
-          <div class="panel-toolbar" style="margin-bottom:1rem">
+          <h3 class="sell-title">Pick Your Pokémon — 100 POKÉ each</h3>
+          <div class="panel-toolbar">
             <input type="search" id="shopSearch" placeholder="Search species..." class="search-input" maxlength="30" />
             <select id="shopTypeFilter" class="filter-select">
               <option value="all">All Types</option>
@@ -311,11 +227,22 @@
               <option value="rare">Rare</option>
             </select>
           </div>
-          <div class="cards-grid" id="shopGrid" style="margin-top:0"></div>
+          <div class="cards-grid" id="shopGrid"></div>
         </div>
 
         <!-- BUY P2P tab -->
         <div class="market-pane hidden" id="marketTab-buy">
+          <!-- Random Pack — available to all users -->
+          <div class="shop-pack-banner">
+            <div class="pack-info">
+              <span class="pack-icon">🎁</span>
+              <div>
+                <strong>Random Pack</strong>
+                <span class="pack-sub">3 random base Pokémon — 250 POKÉ</span>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="buyPackBtn">Buy Random Pack</button>
+          </div>
           <div class="panel-toolbar">
             <input type="search" id="marketSearch" placeholder="Search Pokémon..."
                    class="search-input" aria-label="Search marketplace" maxlength="50" />
@@ -577,6 +504,71 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- Pokémon Detail Modal -->
+  <div class="modal-overlay hidden" id="pokeDetailModal" role="dialog" aria-modal="true" aria-labelledby="pokeDetailTitle">
+    <div class="modal poke-detail-modal">
+
+      <!-- Header band -->
+      <div class="poke-detail-header">
+        <button class="poke-detail-back" id="pokeDetailClose" aria-label="Close">
+          ← Back
+        </button>
+        <div class="poke-detail-title-group">
+          <h2 id="pokeDetailTitle" class="poke-detail-name"></h2>
+          <div class="poke-detail-badges">
+            <span id="pokeDetailRarity" class="rarity-badge"></span>
+            <span id="pokeDetailStage"  class="stage-badge"></span>
+            <span id="pokeDetailType"   class="type-badge"></span>
+          </div>
+        </div>
+        <div class="poke-detail-level-pill">
+          <span id="pokeDetailLevel"></span>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="poke-detail-layout">
+
+        <!-- LEFT: character + stats -->
+        <div class="poke-detail-left">
+          <div class="poke-detail-stage-platform">
+            <img id="pokeDetailGif" src="" alt="" class="poke-detail-gif" />
+          </div>
+          <div class="poke-detail-xp">
+            <div class="xp-bar"><div id="pokeDetailXpFill" class="xp-fill"></div></div>
+            <span id="pokeDetailXpLbl"></span>
+          </div>
+          <div class="poke-detail-stats">
+            <div class="stat-tile stat-hp">
+              <span class="stat-tile-val" id="pokeDetailHp"></span>
+              <span class="stat-tile-lbl">HP</span>
+            </div>
+            <div class="stat-tile stat-atk">
+              <span class="stat-tile-val" id="pokeDetailAtk"></span>
+              <span class="stat-tile-lbl">ATK</span>
+            </div>
+            <div class="stat-tile stat-def">
+              <span class="stat-tile-val" id="pokeDetailDef"></span>
+              <span class="stat-tile-lbl">DEF</span>
+            </div>
+            <div class="stat-tile stat-spd">
+              <span class="stat-tile-val" id="pokeDetailSpd"></span>
+              <span class="stat-tile-lbl">SPD</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: skills -->
+        <div class="poke-detail-right">
+          <p class="poke-detail-section-title">Skills</p>
+          <div id="pokeDetailSkills" class="poke-detail-skills"></div>
+          <div id="pokeDetailEvoLine" class="poke-detail-evo"></div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <!-- Confirm Delete Modal -->
