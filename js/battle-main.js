@@ -178,21 +178,40 @@
 
     // Generate AI seed from userId + timestamp
     const seed = _hashCode(userId + Date.now());
-    const aiTeam = generateAITeam(seed, playerInstances);
+    let aiTeam = generateAITeam(seed, playerInstances);
 
-    // Enrich AI team with metadata-based skills (same as player)
-    for (const pk of aiTeam) {
-      if (window.PokéEvolution?.fetchPokemonMeta) {
+    // ── Enrich AI team with FULL metadata (stats + skills), same as player ──
+    // Without this, AI Pokémon use generic fallback stats instead of real ones.
+    if (window.PokéEvolution?.fetchPokemonMeta) {
+      const enriched = [];
+      for (const pk of aiTeam) {
         try {
           const meta = await PokéEvolution.fetchPokemonMeta(pk.species);
           const attrs = meta?.attributes || [];
           if (attrs.length > 0) {
-            const metaSkills = window.buildSkillsFromMetadata?.(attrs, pk.species, pk.type);
-            if (metaSkills && metaSkills.length > 0) pk.skillPool = metaSkills;
+            // Rebuild the instance from scratch with real metadata attributes
+            const rebuilt = createPokemonInstance({
+              id:              pk.nftId,
+              species:         pk.species,
+              level:           pk.level,
+              attrs,
+              evolution_stage: pk.stage,
+            });
+            // Preserve formation assignment from generateAITeam
+            rebuilt.position = pk.position;
+            rebuilt.role     = pk.role;
+            enriched.push(rebuilt);
+          } else {
+            enriched.push(pk);
           }
-        } catch (_) {}
+        } catch (_) {
+          enriched.push(pk);
+        }
       }
+      aiTeam = enriched;
     }
+
+    console.log('[AI Team]', aiTeam.map(pk => `${pk.species} HP:${pk.hp} ATK:${pk.atk} DEF:${pk.def} SPD:${pk.spd} Skills:${pk.skillPool?.length}`));
 
     // Display opponent in matchmaking
     const aiNameEl = document.getElementById('opponent-name');

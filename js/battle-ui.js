@@ -35,6 +35,9 @@ const BattleUI = (() => {
   /* ── Card queue state (Axie-style: select cards from full hand) ── */
   let _cardQueue    = [];            // cards queued to play this turn
   let _lastSnapRound = 0;           // track round for resetting queue
+  let _handBuilt     = false;       // true once the hand DOM has been built this round
+  let _handPhase     = '';          // last rendered phase (avoid unnecessary rebuilds)
+  let _playedUids    = new Set();   // UIDs of cards currently animating out
 
   /* ── DOM helper ─────────────────────────────────────────────── */
   const $  = id  => document.getElementById(id);
@@ -57,18 +60,25 @@ const BattleUI = (() => {
     _engine = engine;
     _cardQueue = [];
     _lastSnapRound = 0;
+    _handBuilt = false;
+    _handPhase = '';
+    _playedUids = new Set();
 
     engine
-      .on('stateChange',  snap => renderAll(snap))
-      .on('cardPlayed',   ev   => _animateCardPlayed(ev))
-      .on('faint',        ev   => _animateFaint(ev))
-      .on('comboBreak',   ev   => _showComboBurst(ev))
-      .on('statusTick',   ev   => _showStatusTick(ev))
-      .on('roundStart',   ev   => _showRoundBanner(ev))
-      .on('lastStand',    ev   => _showLastStand(ev))
-      .on('lastStandEnd', ev   => _showLastStandEnd(ev))
-      .on('crit',         ev   => _showCritBanner(ev))
-      .on('battleEnd',    ev   => _onBattleEnd(ev));
+      .on('stateChange',     snap => renderAll(snap))
+      .on('cardPlayed',      ev   => _animateCardPlayed(ev))
+      .on('cardsDrawn',      ev   => _animateCardsDrawn(ev))
+      .on('resolveOrder',    ev   => _showResolveOrder(ev))
+      .on('actionResolving', ev   => _showActionBanner(ev))
+      .on('faint',           ev   => _animateFaint(ev))
+      .on('comboBreak',      ev   => _showComboBurst(ev))
+      .on('statusTick',      ev   => _showStatusTick(ev))
+      .on('roundStart',      ev   => _showRoundBanner(ev))
+      .on('lastStand',       ev   => _showLastStand(ev))
+      .on('lastStandEnd',    ev   => _showLastStandEnd(ev))
+      .on('crit',            ev   => _showCritBanner(ev))
+      .on('chainBonus',      ev   => _showChainBanner(ev))
+      .on('battleEnd',       ev   => _onBattleEnd(ev));
   }
 
   function bindCardClick(fn) { _onCardClick = fn; }
@@ -134,16 +144,41 @@ const BattleUI = (() => {
 
       const pkType = (pk.type || 'normal').toLowerCase();
       const typeEmoji = _typeEmoji(pkType);
-      const shieldHtml = pk.shieldAbsorb > 0
-        ? `<div class="hp-shield-badge">🛡️ ${pk.shieldAbsorb}</div>`
-        : '';
+      // Display shield HP (Axie flat shield) or legacy % absorb
+      const shieldVal = pk.shieldHp || 0;
+      const shieldHtml = shieldVal > 0
+        ? `<div class="hp-shield-badge">🛡️ ${shieldVal}</div>`
+        : (pk.shieldAbsorb > 0 ? `<div class="hp-shield-badge">🛡️ ${Math.round(pk.shieldAbsorb * 100)}%</div>` : '');
 
       // Last Stand ticks badge
       const lastStandHtml = inLastStand
         ? `<div class="last-stand-badge">💜 Last Stand ×${pk.lastStand.ticks}</div>`
         : '';
 
+      // Build queued cards stack above Pokémon (only for player side)
+      let queuedCardsHtml = '';
+      if (side === 'player') {
+        const queuedForThis = _cardQueue.filter(c => c._ownerIdx === idx);
+        if (queuedForThis.length > 0) {
+          const cardsHtml = queuedForThis.map((skill, qi) => {
+            const typeClr = _typeColor(skill.type);
+            return `<div class="field-queued-card" style="--type-glow:${typeClr}; --stack-offset:${qi}">
+              <span class="fqc-order">${_cardQueue.indexOf(skill) + 1}</span>
+              <span class="fqc-name">${skill.name}</span>
+              <span class="fqc-energy">⚡${skill.energyCost}</span>
+            </div>`;
+          }).join('');
+          queuedCardsHtml = `<div class="field-queued-stack">${cardsHtml}</div>`;
+        }
+      }
+
+      // Formation position label
+      const posLabels = BATTLE_DATA.FORMATION?.LABELS || { 0: '🛡️ FRONT', 1: '⚔️ MID', 2: '🎯 BACK' };
+      const posLabel = posLabels[pk.position] || posLabels[idx] || '';
+      const roleClass = pk.role || ['tank', 'support', 'carry'][idx] || 'support';
+
       unit.innerHTML = `
+        ${queuedCardsHtml}
         <div class="unit-hp-badge">
           <div class="hp-badge-name">${pk.species}</div>
           <div class="hp-badge-top">
@@ -159,26 +194,32 @@ const BattleUI = (() => {
         <div class="unit-type-badge type-${pkType}">${typeEmoji} ${pkType.toUpperCase()}</div>
         <img class="unit-sprite" src="${gifPath}" alt="${pk.species}" loading="lazy" />
         <div class="unit-shadow"></div>
+        <div class="unit-position-badge role-${roleClass}">${posLabel}</div>
       `;
 
-      /* Click to target opponent units */
+      /* Opponent units are NOT manually targetable — formation enforces targeting.
+         Front-most is always the default target; backdoor cards auto-target back. */
       if (side === 'opponent' && !isFainted) {
-        unit.addEventListener('click', () => {
-          $$('#field-opponent .field-unit').forEach(u => u.classList.remove('targeted-unit'));
-          unit.classList.add('targeted-unit');
-          _selectedTarget = idx;
-        });
+        unit.style.cursor = 'default';
       }
 
       container.appendChild(unit);
     });
 
-    /* Auto-highlight active opponent target */
+    /* Auto-highlight the front-most alive opponent (default target) */
     if (side === 'opponent') {
-      const active = container.querySelector(`.field-unit[data-idx="${activeIdx}"]:not(.fainted-unit)`);
-      if (active) {
-        active.classList.add('targeted-unit');
-        _selectedTarget = activeIdx;
+      // Find front-most alive
+      let frontIdx = -1;
+      for (let i = 0; i < team.length; i++) {
+        const pk = team[i];
+        if (pk && !pk.isFainted) { frontIdx = i; break; }
+      }
+      if (frontIdx >= 0) {
+        const frontUnit = container.querySelector(`.field-unit[data-idx="${frontIdx}"]:not(.fainted-unit)`);
+        if (frontUnit) {
+          frontUnit.classList.add('targeted-unit');
+          _selectedTarget = frontIdx;
+        }
       }
     }
   }
@@ -189,28 +230,56 @@ const BattleUI = (() => {
     if (!strip) return;
     strip.innerHTML = '';
 
-    // Build combined list sorted by HP (lowest first — attacks first)
-    const all = [
-      ...snap.playerTeam.map((pk, i) => ({ pk, side: 'player', idx: i })),
-      ...snap.opponentTeam.map((pk, i) => ({ pk, side: 'opponent', idx: i })),
-    ];
-
-    // Sort by HP asc (lowest HP attacks first), then SPD desc, then Skill desc
-    all.sort((a, b) => {
+    // Axie speed comparator
+    const _spdCmp = (a, b) => {
+      if ((a.pk.spd || 0) !== (b.pk.spd || 0)) return (b.pk.spd || 0) - (a.pk.spd || 0);
       if ((a.pk.hp || 0) !== (b.pk.hp || 0)) return (a.pk.hp || 0) - (b.pk.hp || 0);
-      if ((b.pk.spd || 0) !== (a.pk.spd || 0)) return (b.pk.spd || 0) - (a.pk.spd || 0);
-      return (b.pk.skill || 0) - (a.pk.skill || 0);
-    });
+      if ((a.pk.skill || 0) !== (b.pk.skill || 0)) return (b.pk.skill || 0) - (a.pk.skill || 0);
+      return (b.pk.morale || 0) - (a.pk.morale || 0);
+    };
 
-    all.forEach((entry, orderNum) => {
-      const { pk, side } = entry;
+    // Build & sort each side independently
+    const pList = snap.playerTeam
+      .map((pk, i) => ({ pk, side: 'player', idx: i }))
+      .filter(e => !e.pk.isFainted || (e.pk.lastStand && e.pk.lastStand.ticks > 0))
+      .sort(_spdCmp);
+    const oList = snap.opponentTeam
+      .map((pk, i) => ({ pk, side: 'opponent', idx: i }))
+      .filter(e => !e.pk.isFainted || (e.pk.lastStand && e.pk.lastStand.ticks > 0))
+      .sort(_spdCmp);
+
+    // Side with fastest Pokémon leads
+    const pSpd = pList[0]?.pk.spd || 0;
+    const oSpd = oList[0]?.pk.spd || 0;
+    const first  = pSpd >= oSpd ? pList : oList;
+    const second = pSpd >= oSpd ? oList : pList;
+
+    // Strict alternation: first[0], second[0], first[1], second[1] ...
+    const interleaved = [];
+    const maxLen = Math.max(first.length, second.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < first.length)  interleaved.push(first[i]);
+      if (i < second.length) interleaved.push(second[i]);
+    }
+
+    // Add a "Round N" pill first
+    const roundPill = document.createElement('div');
+    roundPill.className = 'portrait-round-pill';
+    roundPill.textContent = `Round ${snap.round}`;
+    strip.appendChild(roundPill);
+
+    interleaved.forEach((entry, orderNum) => {
+      const { pk, side, idx } = entry;
       const badge = document.createElement('div');
       const sideClass = side === 'player' ? 'player-side' : 'opponent-side';
       const lsClass = pk.lastStand ? ' last-stand-portrait' : '';
       badge.className = `portrait-badge ${sideClass}${pk.isFainted ? ' fainted' : ''}${lsClass}`;
+      badge.dataset.side = side;
+      badge.dataset.idx  = idx;
       badge.innerHTML = `
         <img src="${_getGif(pk.species)}" alt="${pk.species}" />
         <span class="portrait-order">${orderNum + 1}</span>
+        <span class="portrait-name">${pk.species}</span>
       `;
       strip.appendChild(badge);
     });
@@ -225,7 +294,7 @@ const BattleUI = (() => {
     if (phaseEl) {
       const labels = {
         player_turn: '⚔️ Your Turn — Select Cards',
-        resolving:   '💚 Lowest HP attacks first…',
+        resolving:   '⚡ Resolving — fastest attacks first…',
         round_end:   '⏳ Round End',
         ended:       '🏆 Battle Over',
         waiting:     '…',
@@ -235,6 +304,14 @@ const BattleUI = (() => {
 
     _renderPlayerEnergy(snap.energyPlayer, snap);
     _renderOpponentEnergy(snap.energyOpponent);
+
+    // Deck / Hand / Discard counters
+    const deckEl = $('deck-count');
+    const handCntEl = $('hand-count');
+    const discardEl = $('discard-count');
+    if (deckEl)    deckEl.textContent    = `🃏 ${(snap.playerDeck || []).length}`;
+    if (handCntEl) handCntEl.textContent = `✋ ${(snap.playerHand || []).length}`;
+    if (discardEl) discardEl.textContent = `♻️ ${(snap.playerDiscard || []).length}`;
   }
 
   function _renderPlayerEnergy(current, snap) {
@@ -270,47 +347,83 @@ const BattleUI = (() => {
   }
 
   /* ══════════════════════════════════════════════════════════════
-     CARD HAND — AXIE INFINITY STYLE
+     CARD HAND — AXIE INFINITY STYLE (Deck / Hand / Discard)
      ──────────────────────────────────────────────────────────────
-     ALL skills from ALL alive Pokémon are shown (no random draw).
-     Player clicks a card → it becomes "selected" (lifted + glowing).
-     Click again → deselected. Queue tracks selection order.
-     On End Turn → engine resolves all queued cards in speed order.
+     Start: 12-card deck (4 skills × 3 Pokémon), draw 6 initially.
+     Each round: draw 3 more. Hand persists between rounds.
+     Played cards → discard pile. Deck empty → reshuffle discard.
+     Fainted Pokémon's cards are purged everywhere.
      ══════════════════════════════════════════════════════════════ */
 
   function _renderHand(snap) {
     const hand = $('skill-hand');
     if (!hand) return;
-    hand.innerHTML = '';
 
     // Reset queue on new round
     if (snap.round !== _lastSnapRound) {
       _cardQueue = [];
       _lastSnapRound = snap.round;
+      _handBuilt = false;
+      _playedUids.clear();
     }
 
+    // ── During resolving / non-player phases: keep hand visible, just disable clicks ──
     if (snap.phase !== 'player_turn') {
-      _renderQueueSection(snap);
-      const msg = document.createElement('p');
-      msg.style.cssText = 'color:rgba(255,255,255,0.3);font-family:var(--font-game);align-self:center;padding:0 16px;font-size:0.9rem';
-      msg.textContent = snap.phase === 'resolving' ? '💚 Resolving — lowest HP first…' : '';
-      hand.appendChild(msg);
+      hand.classList.add('hand-no-interact');
+      hand.classList.remove('hand-disabled');
+      hand.querySelectorAll('.skill-card').forEach(c => c.classList.remove('card-selected'));
+      hand.querySelectorAll('.card-queue-badge').forEach(b => b.remove());
+      _handPhase = snap.phase;
       return;
     }
 
-    // Compute total energy committed in queue
+    hand.classList.remove('hand-disabled', 'hand-no-interact');
+
+    // ── Build the hand structure from scratch only when needed ──
+    const handCards = snap.playerHand || [];
+    const currentUids = new Set(handCards.map(c => c._uid));
+
+    // Check if we need a full rebuild (new round, first render, or cards changed significantly)
+    const existingCards = hand.querySelectorAll('.skill-card[data-uid]');
+    const existingUids = new Set();
+    existingCards.forEach(c => existingUids.add(c.dataset.uid));
+
+    const needsRebuild = !_handBuilt
+      || _handPhase !== 'player_turn';
+
+    _handPhase = snap.phase;
+
+    if (needsRebuild) {
+      // Full rebuild — but we'll still preserve structure where possible
+      _fullBuildHand(hand, snap, handCards);
+      _handBuilt = true;
+      return;
+    }
+
+    // ── Incremental update — only toggle classes, remove played cards ──
+    _incrementalUpdateHand(hand, snap, handCards, currentUids, existingUids);
+  }
+
+  /** Full rebuild of the hand DOM (first render of a round or after phase change) */
+  function _fullBuildHand(hand, snap, handCards) {
+    hand.innerHTML = '';
+
     const queuedEnergy = _cardQueue.reduce((sum, c) => sum + c.energyCost, 0);
     const availableEnergy = snap.energyPlayer - queuedEnergy;
 
-    // Build card groups from ALL alive Pokémon
+    // Build card groups from shared hand (Axie-style deck/hand system)
     const groups = {};
     snap.playerTeam.forEach((pk, pkIdx) => {
       if (pk.isFainted && !(pk.lastStand && pk.lastStand.ticks > 0)) return;
-      const key = pkIdx;
-      groups[key] = { species: pk.species, pkIdx, cards: [], pk };
-      (pk.skillPool || []).forEach((skill, skillIdx) => {
-        groups[key].cards.push({ ...skill, _ownerIdx: pkIdx, _ownerSpecies: pk.species, _skillIdx: skillIdx });
-      });
+      groups[pkIdx] = { species: pk.species, pkIdx, cards: [], pk };
+    });
+
+    // Group hand cards by their owner Pokémon
+    handCards.forEach((card) => {
+      const ownerIdx = card._ownerIdx;
+      if (groups[ownerIdx]) {
+        groups[ownerIdx].cards.push({ ...card });
+      }
     });
 
     const groupArr = Object.values(groups);
@@ -346,88 +459,8 @@ const BattleUI = (() => {
       cardsRow.className = 'card-group-cards';
 
       group.cards.forEach(skill => {
-        // Check if this specific card is already queued
-        const queueIdx = _cardQueue.findIndex(q =>
-          q.id === skill.id && q._ownerIdx === skill._ownerIdx && q._skillIdx === skill._skillIdx
-        );
-        const isQueued = queueIdx >= 0;
-
-        const canAfford = skill.energyCost <= availableEnergy || isQueued; // can always un-queue
-        const underLimit = _cardQueue.length < (BATTLE_DATA.ENERGY.MAX_CARDS_PER_TURN || 5) || isQueued;
-        const canPlay = (canAfford && underLimit) || isQueued;
-        const typeClr  = _typeColor(skill.type);
-        const ownerGif = _getGif(skill._ownerSpecies);
-        const dmgLabel = skill.rawAttack > 0 ? `${skill.rawAttack}` : (skill.dmgMulti > 0 ? `${Math.round(skill.dmgMulti * 10)}` : '—');
-        const shieldLbl = skill.shieldAmt > 0 ? `${skill.shieldAmt}` : '—';
-
-        const card = document.createElement('div');
-        card.className = `skill-card type-${skill.type}${canPlay ? '' : ' sc-disabled'}${isQueued ? ' card-selected' : ''}`;
-        card.style.setProperty('--type-glow', typeClr);
-        card.dataset.skillId = skill.id;
-
-        // Queue order badge for selected cards
-        const queueBadgeHtml = isQueued
-          ? `<div class="card-queue-badge">${queueIdx + 1}</div>`
-          : '';
-
-        card.innerHTML = `
-          ${queueBadgeHtml}
-          <div class="sc-type-bar"></div>
-          <div class="sc-energy">${skill.energyCost}</div>
-          <div class="sc-art">
-            <img class="sc-art-gif" src="${ownerGif}" alt="${skill._ownerSpecies}" loading="lazy"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
-            <span class="sc-art-icon" style="display:none">${skill.icon || '⚡'}</span>
-          </div>
-          <div class="sc-name">${skill.name}</div>
-          <div class="sc-type-label">${skill.type.toUpperCase()}</div>
-          <div class="sc-stats-row">
-            <div class="sc-stat">
-              <span class="sc-stat-val">⚔️ ${dmgLabel}</span>
-              <span class="sc-stat-lbl">DMG</span>
-            </div>
-            <div class="sc-stat">
-              <span class="sc-stat-val">🛡️ ${shieldLbl}</span>
-              <span class="sc-stat-lbl">DEF</span>
-            </div>
-          </div>
-        `;
-
-        // Click toggles selection
-        if (snap.phase === 'player_turn') {
-          card.addEventListener('click', (e) => {
-            e.stopPropagation();
-            try {
-              if (isQueued) {
-                // Deselect — remove from queue
-                _cardQueue.splice(queueIdx, 1);
-                if (_engine) _engine.unqueueCard('player', queueIdx);
-              } else if (canPlay) {
-                // Select — add to queue
-                const queueEntry = { ...skill, _handIdx: _cardQueue.length };
-                _cardQueue.push(queueEntry);
-                // Queue in engine too
-                if (_engine) {
-                  const result = _engine.queueCard('player', skill.id, _selectedTarget, skill._ownerIdx);
-                  if (!result.ok) {
-                    _cardQueue.pop(); // revert
-                    console.warn('[BattleUI] queueCard failed:', result.reason, skill.id);
-                  }
-                }
-              }
-              // Single re-render with latest engine state
-              if (_engine) {
-                renderAll(_engine.toSnapshot());
-              } else {
-                _renderHand(snap);
-              }
-            } catch (err) {
-              console.error('[BattleUI] Card click error:', err);
-            }
-          });
-        }
-
-        cardsRow.appendChild(card);
+        const cardEl = _createCardElement(skill, snap, availableEnergy);
+        cardsRow.appendChild(cardEl);
       });
 
       groupEl.appendChild(cardsRow);
@@ -442,57 +475,219 @@ const BattleUI = (() => {
       hand.appendChild(msg);
     }
 
-    _renderQueueSection(snap);
     _updateEndTurnBtn(snap);
   }
 
-  /* ── Render the queued-cards strip ─────────────────────── */
-  function _renderQueueSection(snap) {
-    const section = $('card-queue-section');
-    const queueEl = $('card-queue');
-    const costEl  = $('queue-energy-cost');
-    if (!section || !queueEl) return;
+  /** Create a single skill card DOM element */
+  function _createCardElement(skill, snap, availableEnergy) {
+    const queueIdx = _cardQueue.findIndex(q => q._uid === skill._uid);
+    const isQueued = queueIdx >= 0;
 
-    queueEl.innerHTML = '';
+    const canAfford = skill.energyCost <= availableEnergy || isQueued;
+    const canPlay = canAfford || isQueued;
+    const typeClr  = _typeColor(skill.type);
+    const ownerGif = _getGif(skill._ownerSpecies);
+    const dmgLabel = skill.rawAttack > 0 ? `${skill.rawAttack}` : (skill.dmgMulti > 0 ? `${Math.round(skill.dmgMulti * 10)}` : '—');
+    const shieldLbl = skill.shieldAmt > 0 ? `${skill.shieldAmt}` : '—';
 
-    if (_cardQueue.length === 0) {
-      section.classList.remove('has-cards');
-      return;
+    const card = document.createElement('div');
+    card.className = `skill-card type-${skill.type}${canPlay ? '' : ' sc-disabled'}${isQueued ? ' card-selected' : ''}`;
+    // Add enter animation for newly drawn cards
+    const pendingDrawn = _animateCardsDrawn._pending;
+    if (pendingDrawn && pendingDrawn.has(skill._uid)) {
+      card.classList.add('card-enter');
+      pendingDrawn.delete(skill._uid);
+      // Remove the class after animation so it doesn't replay
+      card.addEventListener('animationend', () => card.classList.remove('card-enter'), { once: true });
+    }
+    card.style.setProperty('--type-glow', typeClr);
+    card.dataset.skillId = skill.id;
+    card.dataset.uid = skill._uid;
+
+    const queueBadgeHtml = isQueued
+      ? `<div class="card-queue-badge">${queueIdx + 1}</div>`
+      : '';
+    const backdoorBadgeHtml = skill.targeting === 'backdoor'
+      ? `<div class="card-backdoor-badge">🎯 BACK</div>`
+      : '';
+
+    card.innerHTML = `
+      ${queueBadgeHtml}
+      ${backdoorBadgeHtml}
+      <div class="sc-type-bar"></div>
+      <div class="sc-energy">${skill.energyCost}</div>
+      <div class="sc-art">
+        <img class="sc-art-gif" src="${ownerGif}" alt="${skill._ownerSpecies}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+        <span class="sc-art-icon" style="display:none">${skill.icon || '⚡'}</span>
+      </div>
+      <div class="sc-name">${skill.name}</div>
+      <div class="sc-type-label">${skill.type.toUpperCase()}</div>
+      <div class="sc-stats-row">
+        <div class="sc-stat">
+          <span class="sc-stat-val">⚔️ ${dmgLabel}</span>
+          <span class="sc-stat-lbl">DMG</span>
+        </div>
+        <div class="sc-stat">
+          <span class="sc-stat-val">🛡️ ${shieldLbl}</span>
+          <span class="sc-stat-lbl">DEF</span>
+        </div>
+      </div>
+    `;
+
+    // Click toggles selection
+    if (snap.phase === 'player_turn') {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _handleCardClick(skill, snap);
+      });
     }
 
-    section.classList.add('has-cards');
+    return card;
+  }
 
-    _cardQueue.forEach((skill, qIdx) => {
-      const gifPath = _getGif(skill._ownerSpecies);
-      const typeClr = _typeColor(skill.type);
+  /** Handle card click — queue/unqueue with animation */
+  function _handleCardClick(skill, snap) {
+    try {
+      const queueIdx = _cardQueue.findIndex(q => q._uid === skill._uid);
+      const isQueued = queueIdx >= 0;
 
-      const qCard = document.createElement('div');
-      qCard.className = 'queue-card';
-      qCard.style.setProperty('--type-glow', typeClr);
-      qCard.innerHTML = `
-        <span class="queue-card-num">${qIdx + 1}</span>
-        <img src="${gifPath}" alt="${skill._ownerSpecies}" />
-        <div class="queue-card-info">
-          <span class="queue-card-name">${skill.name}</span>
-          <span class="queue-card-owner">${skill._ownerSpecies}</span>
-        </div>
-        <span class="queue-card-energy">⚡${skill.energyCost}</span>
-      `;
+      if (isQueued) {
+        // Deselect — remove from queue
+        _cardQueue.splice(queueIdx, 1);
+        if (_engine) _engine.unqueueCard('player', queueIdx);
+      } else {
+        const queuedEnergy = _cardQueue.reduce((sum, c) => sum + c.energyCost, 0);
+        const availableEnergy = (_engine?.state?.energyPlayer || 0) - queuedEnergy;
+        const canAfford = skill.energyCost <= availableEnergy;
+        if (!canAfford) return;
 
-      // Click to remove from queue
-      if (snap.phase === 'player_turn') {
-        qCard.addEventListener('click', () => {
-          _cardQueue.splice(qIdx, 1);
-          if (_engine) _engine.unqueueCard('player', qIdx);
-          _renderHand(snap);
-        });
+        // Select — add to queue with fly-up animation
+        const cardEl = document.querySelector(`.skill-card[data-uid="${skill._uid}"]`);
+        if (cardEl) {
+          cardEl.classList.add('card-fly-up');
+          // Remove the class after animation so it can be re-triggered
+          setTimeout(() => cardEl.classList.remove('card-fly-up'), 300);
+        }
+
+        const queueEntry = { ...skill, _handIdx: _cardQueue.length };
+        _cardQueue.push(queueEntry);
+        if (_engine) {
+          const result = _engine.queueCard('player', skill.id, _selectedTarget, skill._ownerIdx);
+          if (!result.ok) {
+            _cardQueue.pop();
+            console.warn('[BattleUI] queueCard failed:', result.reason, skill.id);
+            return;
+          }
+        }
       }
 
-      queueEl.appendChild(qCard);
+      // Incremental update instead of full re-render
+      const latestSnap = _engine ? _engine.toSnapshot() : snap;
+      _incrementalUpdateHand($('skill-hand'), latestSnap, latestSnap.playerHand || [], null, null);
+      _renderTeamField('player', latestSnap.playerTeam, latestSnap.activePlayer);
+      _renderHUD_energy(latestSnap);
+      _updateEndTurnBtn(latestSnap);
+    } catch (err) {
+      console.error('[BattleUI] Card click error:', err);
+    }
+  }
+
+  /** Incremental DOM update — only change classes/badges without rebuilding */
+  function _incrementalUpdateHand(hand, snap, handCards) {
+    if (!hand) return;
+    const queuedEnergy = _cardQueue.reduce((sum, c) => sum + c.energyCost, 0);
+    const availableEnergy = snap.energyPlayer - queuedEnergy;
+
+    // Update combo badges on group headers
+    const queuedByPk = {};
+    _cardQueue.forEach(c => {
+      queuedByPk[c._ownerIdx] = (queuedByPk[c._ownerIdx] || 0) + 1;
     });
 
-    const totalCost = _cardQueue.reduce((s, c) => s + c.energyCost, 0);
-    if (costEl) costEl.textContent = `⚡ ${totalCost} total`;
+    hand.querySelectorAll('.card-group').forEach(groupEl => {
+      const comboBadge = groupEl.querySelector('.combo-badge');
+      const headerSpan = groupEl.querySelector('.card-group-header span');
+      if (!headerSpan) return;
+      // Find pokémon index from the first card in this group
+      const firstCard = groupEl.querySelector('.skill-card[data-uid]');
+      if (!firstCard) return;
+      const uid = firstCard.dataset.uid;
+      const matchingCard = handCards.find(c => c._uid === uid);
+      if (!matchingCard) return;
+      const pkIdx = matchingCard._ownerIdx;
+      const comboCount = queuedByPk[pkIdx] || 0;
+
+      // Update or create combo badge
+      const existingBadge = groupEl.querySelector('.combo-badge');
+      if (comboCount > 1) {
+        if (existingBadge) {
+          existingBadge.textContent = `🔥 Combo ×${comboCount}`;
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'combo-badge';
+          badge.textContent = `🔥 Combo ×${comboCount}`;
+          groupEl.querySelector('.card-group-header')?.appendChild(badge);
+        }
+      } else if (existingBadge) {
+        existingBadge.remove();
+      }
+    });
+
+    // Update each card's classes and badges
+    hand.querySelectorAll('.skill-card[data-uid]').forEach(cardEl => {
+      const uid = cardEl.dataset.uid;
+      const queueIdx = _cardQueue.findIndex(q => q._uid === uid);
+      const isQueued = queueIdx >= 0;
+      const skill = handCards.find(c => c._uid === uid);
+      if (!skill) return;
+
+      const canAfford = skill.energyCost <= availableEnergy || isQueued;
+      const canPlay = canAfford || isQueued;
+
+      // Update selection state
+      cardEl.classList.toggle('card-selected', isQueued);
+      cardEl.classList.toggle('sc-disabled', !canPlay);
+
+      // Update queue badge
+      let badge = cardEl.querySelector('.card-queue-badge');
+      if (isQueued) {
+        if (badge) {
+          badge.textContent = queueIdx + 1;
+        } else {
+          badge = document.createElement('div');
+          badge.className = 'card-queue-badge';
+          badge.textContent = queueIdx + 1;
+          cardEl.insertBefore(badge, cardEl.firstChild);
+        }
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
+  /** Update only the energy display (no full HUD rebuild) */
+  function _renderHUD_energy(snap) {
+    // Update energy number
+    const numEl = document.querySelector('.energy-num');
+    if (numEl) numEl.textContent = snap.energyPlayer;
+    // Update pips
+    const pipsEl = $('energy-pips');
+    if (pipsEl) {
+      const maxE = BATTLE_DATA?.ENERGY?.MAX || 10;
+      const pips = pipsEl.querySelectorAll('.energy-pip');
+      pips.forEach((pip, i) => {
+        pip.classList.toggle('empty', i >= snap.energyPlayer);
+      });
+    }
+  }
+
+  /* ── Render the queued-cards (now shown above Pokémon on field) ── */
+  function _renderQueueSection(snap) {
+    // Queue cards are now rendered in _renderTeamField above each Pokémon.
+    // Hide the old queue section.
+    const section = $('card-queue-section');
+    if (section) section.classList.remove('has-cards');
   }
 
   /* ── Combo HUD — shows per-Pokémon combo stacks ─────────────── */
@@ -561,6 +756,31 @@ const BattleUI = (() => {
   }
 
   function _animateCardPlayed(ev) {
+    // ── Animate card out of hand (real-time removal) ──
+    if (ev.side === 'player' && ev._cardUid) {
+      const cardEl = document.querySelector(`.skill-card[data-uid="${ev._cardUid}"]`);
+      if (cardEl) {
+        _playedUids.add(ev._cardUid);
+        cardEl.classList.add('card-played-out');
+        cardEl.addEventListener('animationend', () => {
+          cardEl.remove();
+          _playedUids.delete(ev._cardUid);
+          // Clean up empty groups
+          const hand = $('skill-hand');
+          if (hand) {
+            hand.querySelectorAll('.card-group').forEach(g => {
+              if (g.querySelectorAll('.skill-card').length === 0) {
+                // Remove group and its divider
+                const prev = g.previousElementSibling;
+                if (prev && prev.classList.contains('card-group-divider')) prev.remove();
+                g.remove();
+              }
+            });
+          }
+        }, { once: true });
+      }
+    }
+
     if (!ev.target || ev.damage <= 0) return;
 
     // Highlight the attacking Pokémon
@@ -595,6 +815,15 @@ const BattleUI = (() => {
       unitEl.classList.remove(shakeClass, 'te-flash');
       unitEl.style.opacity = '';
     }, 600);
+  }
+
+  /** Animate newly drawn cards into the hand */
+  function _animateCardsDrawn(ev) {
+    if (ev.side !== 'player') return;
+    // New cards will be rendered on next stateChange → _renderHand → _fullBuildHand
+    // We mark them so _fullBuildHand can add the card-enter animation class
+    if (!_animateCardsDrawn._pending) _animateCardsDrawn._pending = new Set();
+    (ev.cards || []).forEach(c => _animateCardsDrawn._pending.add(c._uid));
   }
 
   function _showDmgPop(anchorEl, dmg, typeMulti, isCrit, comboStack, comboBonusDmg) {
@@ -654,11 +883,36 @@ const BattleUI = (() => {
   }
 
   function _showRoundBanner(ev) {
+    // Clean up active portrait highlight from previous round
+    document.querySelectorAll('.portrait-active').forEach(p => p.classList.remove('portrait-active'));
+
     const banner = document.createElement('div');
     banner.className = 'round-banner';
     banner.textContent = `⚔️ Round ${ev.round} — ⚡+${BATTLE_DATA.ENERGY.REGEN_PER_ROUND} Energy`;
     ($('screen-battle') || document.body).appendChild(banner);
     setTimeout(() => banner.remove(), 1200);
+  }
+
+  /* _showResolveOrder / _showResolveStrip removed — portrait strip now shows
+     the alternating play order from round start via _renderPortraitStrip */
+  function _showResolveOrder(_ev) { /* no-op, order shown in portrait strip */ }
+
+  /** Show a small action banner + highlight active portrait for each resolving card */
+  function _showActionBanner(ev) {
+    // Remove any previous action banner
+    document.querySelectorAll('.action-banner').forEach(b => b.remove());
+    const isPlayer = ev.side === 'player';
+    const pos = ev.index + 1;
+    const banner = document.createElement('div');
+    banner.className = `action-banner ${isPlayer ? 'action-player' : 'action-opponent'}`;
+    banner.textContent = `#${pos} ${isPlayer ? '🔵 YOU' : '🔴 ENEMY'} — ${ev.casterSpecies} uses ${ev.skillName}`;
+    ($('screen-battle') || document.body).appendChild(banner);
+    setTimeout(() => banner.remove(), 850);
+
+    // Highlight the active portrait in the play-order strip
+    const portraits = document.querySelectorAll('#team-portraits .portrait-badge');
+    portraits.forEach(p => p.classList.remove('portrait-active'));
+    if (portraits[ev.index]) portraits[ev.index].classList.add('portrait-active');
   }
 
   /* ── Last Stand visuals ─────────────────────────────────────── */
@@ -692,6 +946,17 @@ const BattleUI = (() => {
     banner.style.color = '#ff3b30';
     ($('screen-battle') || document.body).appendChild(banner);
     setTimeout(() => banner.remove(), 1000);
+  }
+
+  /* ── Chain bonus banner ────────────────────────────────────── */
+  function _showChainBanner(ev) {
+    const sideLbl = ev.side === 'player' ? 'Your' : 'AI';
+    const banner = document.createElement('div');
+    banner.className = 'round-banner chain-banner-anim';
+    banner.textContent = `🔗 ${sideLbl} ${ev.type.toUpperCase()} CHAIN! +${ev.shieldBonus} Shield (${ev.participants} Pokémon)`;
+    banner.style.color = '#30d5c8';
+    ($('screen-battle') || document.body).appendChild(banner);
+    setTimeout(() => banner.remove(), 1200);
   }
 
   /* ══════════════════════════════════════════════════════════════

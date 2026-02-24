@@ -291,30 +291,63 @@
     letter-spacing: 0.5px;
   }
   #team-portraits {
-    display: flex; align-items: center; gap: 3px; margin-top: 2px;
+    display: flex; align-items: center; gap: 4px; margin-top: 4px;
+    padding: 4px 10px;
+    background: rgba(0,0,0,0.55);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .portrait-round-pill {
+    font-family: var(--font-game);
+    font-size: 0.55rem; font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #38a838, #2d8a2d);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #50c050;
+    white-space: nowrap;
+    margin-right: 4px;
   }
   .portrait-badge {
-    width: 28px; height: 28px;
-    border-radius: 6px;
+    width: 42px; height: 42px;
+    border-radius: 8px;
     border: 2px solid rgba(255,255,255,0.3);
-    overflow: hidden;
+    overflow: visible;
     background: rgba(0,0,0,0.5);
     display: flex; align-items: center; justify-content: center;
-    transition: opacity 0.3s;
+    transition: all 0.25s ease;
     position: relative;
+    flex-shrink: 0;
   }
-  .portrait-badge img { width: 22px; height: 22px; object-fit: contain; image-rendering: auto; }
+  .portrait-badge img { width: 34px; height: 34px; object-fit: contain; image-rendering: auto; }
   .portrait-badge.fainted { opacity: 0.2; filter: grayscale(1); border-color: #ff3b30; }
-  .portrait-badge.player-side { border-color: #40b0ff; background: rgba(30,80,140,0.6); }
-  .portrait-badge.opponent-side { border-color: #ff6040; background: rgba(140,40,20,0.6); }
+  .portrait-badge.player-side { border-color: #40b0ff; background: rgba(30,80,180,0.55); }
+  .portrait-badge.opponent-side { border-color: #ff6040; background: rgba(180,40,20,0.55); }
   /* Speed‐order number in portrait */
   .portrait-order {
-    position: absolute; bottom: -1px; right: -1px;
-    width: 14px; height: 14px;
-    background: rgba(0,0,0,0.75);
-    border-radius: 3px 0 3px 0;
+    position: absolute; bottom: -4px; right: -4px;
+    width: 16px; height: 16px;
+    background: rgba(0,0,0,0.85);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-game); font-size: 0.45rem; color: #fff;
+    font-family: var(--font-game); font-size: 0.5rem; font-weight: 800; color: #fff;
+  }
+  .portrait-name {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    font-family: var(--font-game); font-size: 0.38rem; font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
+  /* Active attacker highlight during resolution */
+  .portrait-active {
+    transform: scale(1.25);
+    filter: brightness(1.4);
+    box-shadow: 0 0 14px rgba(255,255,100,0.6);
+    z-index: 5;
+    border-color: #ffdd44 !important;
   }
   .portrait-sep { font-size: 0.6rem; color: rgba(255,255,255,0.25); }
 
@@ -339,13 +372,14 @@
     overflow: visible;
   }
 
-  /* Player team — left side, facing right toward opponent */
+  /* Player team — left side, facing right toward opponent.
+     row-reverse so FRONT (idx 0) is rightmost = closest to enemy center */
   #field-player {
     position: absolute;
     left: 2%;
     right: 52%;
     bottom: 30%;
-    display: flex; flex-direction: row;
+    display: flex; flex-direction: row-reverse;
     align-items: flex-end;
     justify-content: center;
     gap: 6px;
@@ -375,24 +409,19 @@
     cursor: default;
     transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), filter 0.25s, opacity 0.25s;
   }
-  /* Active front fighter — fully bright with glow */
+  /* All Pokémon — equal size, no scaling differences */
   .field-unit.active-unit {
-    transform: scale(1.08);
     transform-origin: bottom center;
     opacity: 1;
     z-index: 3;
-    filter: drop-shadow(0 4px 12px rgba(255,220,50,0.35));
   }
-  /* Benched — slightly smaller but VISIBLE (Axie shows all 3) */
   .field-unit.benched-unit {
-    transform: scale(0.78);
     transform-origin: bottom center;
-    opacity: 0.88;
+    opacity: 1;
     z-index: 2;
   }
   .field-unit.fainted-unit {
     pointer-events: none; z-index: 1;
-    transform: scale(0.55);
     transform-origin: bottom center;
     filter: grayscale(1) brightness(0.5);
     opacity: 0.4;
@@ -415,9 +444,12 @@
   #field-player   .unit-sprite { transform: scaleX(-1); }
   #field-opponent .unit-sprite { transform: scaleX(1); }
 
-  /* Depth stacking — units closest to center are bigger/in front */
-  #field-player   .field-unit:last-child  { z-index: 4; } /* rightmost = closest to enemy */
-  #field-opponent .field-unit:first-child { z-index: 4; } /* leftmost  = closest to player */
+  /* Formation depth: FRONT (idx 0) is closest to center on both sides.
+     Player uses row-reverse so first-child visually = rightmost;
+     Opponent uses row so first-child visually = leftmost.
+     Both: first-child = FRONT = highest z-index. */
+  #field-player   .field-unit:first-child { z-index: 4; }
+  #field-opponent .field-unit:first-child { z-index: 4; }
 
   /* Ground shadow — Axie-style elliptical */
   .unit-shadow {
@@ -429,11 +461,11 @@
     flex-shrink: 0;
     transition: all 0.25s;
   }
-  .active-unit  .unit-shadow { width: 110%; height: 22px; }
-  .benched-unit .unit-shadow { width: 70%; opacity: 0.65; }
+  .active-unit  .unit-shadow { width: 85%; }
+  .benched-unit .unit-shadow { width: 85%; }
   .fainted-unit .unit-shadow { opacity: 0; }
 
-  /* Sprite sizes — Axie-large, crisp and prominent */
+  /* Sprite sizes — equal for all Pokémon */
   .unit-sprite {
     width: 160px; height: 160px;
     object-fit: contain;
@@ -441,8 +473,6 @@
     display: block;
     flex-shrink: 0;
   }
-  .active-unit  .unit-sprite { width: 200px; height: 200px; }
-  .benched-unit .unit-sprite { width: 150px; height: 150px; }
 
   /* HP badge — Axie-style: compact floating badge (type-icon + HP number + thin bar) */
   .unit-hp-badge {
@@ -501,20 +531,66 @@
   .hp-status-row { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; }
   .hp-status-icon { font-size: 0.65rem; }
 
-  /* Type badge — Axie-style colored pill above the sprite */
-  .unit-type-badge {
+  /* Type badge & position badge — hidden (clean look) */
+  .unit-type-badge { display: none; }
+  .unit-position-badge { display: none; }
+
+  /* ── Queued cards stacked above Pokémon on the field ── */
+  .field-queued-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 4px;
+    position: relative;
+    min-height: 30px;
+    animation: field-queue-pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes field-queue-pop-in {
+    0%   { transform: scale(0.5) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .field-queued-card {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, rgba(50,30,10,0.92), rgba(25,14,4,0.96));
+    border: 2px solid var(--type-glow, rgba(255,200,50,0.4));
+    border-radius: 8px;
+    padding: 3px 8px 3px 6px;
     font-family: var(--font-game);
-    font-size: 0.52rem;
-    color: #fff;
-    background: var(--type-glow, #888);
-    border-radius: 6px;
-    padding: 1px 8px;
-    text-align: center;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    letter-spacing: 0.8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    margin-top: 2px;
+    position: relative;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.5), 0 0 12px color-mix(in srgb, var(--type-glow, #ff9500) 30%, transparent);
+    margin-top: -2px;
+    z-index: calc(10 - var(--stack-offset, 0));
+    backdrop-filter: blur(4px);
+    animation: field-card-slide 0.25s ease-out;
+    max-width: 140px;
     white-space: nowrap;
+  }
+  @keyframes field-card-slide {
+    0%   { transform: translateY(-8px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  .field-queued-card .fqc-order {
+    width: 16px; height: 16px;
+    background: linear-gradient(135deg, #ffe566, #ff9500);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.5rem; color: #1a0d05; font-weight: 900;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .field-queued-card .fqc-name {
+    font-size: 0.55rem; color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    overflow: hidden; text-overflow: ellipsis;
+    max-width: 72px;
+  }
+  .field-queued-card .fqc-energy {
+    font-size: 0.52rem; color: #ff9500;
+    text-shadow: 0 0 4px rgba(255,149,0,0.4);
+    flex-shrink: 0;
   }
 
   /* Damage pop — with stroke for bright background visibility */
@@ -543,30 +619,14 @@
   #battle-bottom {
     position: relative;
     flex-shrink: 0;
-    display: flex; flex-direction: column;
+    display: flex; 
+    flex-direction: column;
     z-index: 20;
-    background:
-      linear-gradient(180deg, rgba(40,28,15,0.95) 0%, rgba(25,15,8,0.98) 100%);
-    border-top: 3px solid var(--wood-edge);
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
   }
 
-  /* ── Card Queue row — Axie-style, below HUD ── */
+  /* ── Card Queue row — hidden (cards now shown above Pokémon) ── */
   #card-queue-section {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 16px;
-    background: linear-gradient(180deg, rgba(45,30,12,0.92), rgba(30,18,8,0.88));
-    border-bottom: 2px solid var(--wood-light);
-    min-height: 48px;
-    overflow-x: auto;
-    z-index: 15;
-    position: relative;
-    flex-shrink: 0;
-  }
-  #card-queue-section.has-cards {
-    display: flex;
+    display: none !important;
   }
   #card-queue-label {
     font-family: var(--font-game);
@@ -645,7 +705,6 @@
   #combo-section {
     display: flex; align-items: center; gap: 10px;
     padding: 2px 14px;
-    border-bottom: 1px solid rgba(255,200,50,0.08);
     min-height: 20px;
   }
   #combo-hud {
@@ -671,7 +730,9 @@
 
   /* Cards + energy + end-turn row — Axie layout */
   #cards-actions-row {
-    display: flex; align-items: center; gap: 0;
+    display: flex; 
+    align-items: center; 
+    gap: 0;
     padding: 4px 12px 8px;
   }
 
@@ -708,14 +769,13 @@
   }
   .energy-pip.empty { background: var(--energy-empty); box-shadow: none; }
 
-  /* Skill cards — Axie Infinity card design */
+  /* Skill cards — Axie Infinity card design (compact drawn cards) */
   #skill-hand-section { display: none; }
   #skill-hand {
     flex: 1;
-    display: flex; align-items: flex-end; gap: 6px;
-    overflow-x: auto; padding: 2px 4px 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,200,50,0.3) transparent;
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 22px 8px 0;
+    justify-content: center;
   }
   /* Card group wrapper per Pokémon */
   .card-group {
@@ -765,17 +825,59 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
   }
   .skill-card:hover:not(.sc-disabled) {
-    transform: translateY(-18px) scale(1.08);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 24px var(--type-glow, rgba(255,255,255,0.2));
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5), 0 0 12px var(--type-glow, rgba(255,255,255,0.15));
     z-index: 5;
   }
-  .skill-card:active:not(.sc-disabled) { transform: translateY(-8px) scale(1.03); }
+  .skill-card:active:not(.sc-disabled) { transform: translateY(-2px); }
   .skill-card.sc-disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(0.5); }
+
+  /* ── Hand during resolving — keep fully visible, just disable interaction ── */
+  #skill-hand.hand-disabled {
+    pointer-events: none;
+    opacity: 0.4;
+    filter: grayscale(0.3);
+    transition: opacity 0.3s, filter 0.3s;
+  }
+  #skill-hand.hand-no-interact {
+    pointer-events: none;
+  }
+
+  /* ── Card played out — shrink + fade + fly up ── */
+  .skill-card.card-played-out {
+    animation: card-played-out 0.45s ease-in forwards;
+    pointer-events: none;
+  }
+  @keyframes card-played-out {
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    40%  { transform: translateY(-30px) scale(0.9); opacity: 0.7; }
+    100% { transform: translateY(-60px) scale(0.4); opacity: 0; max-width: 0; margin: 0; padding: 0; border-width: 0; overflow: hidden; }
+  }
+
+  /* ── Card enter — slide in from below + fade in ── */
+  .skill-card.card-enter {
+    animation: card-enter 0.4s ease-out;
+  }
+  @keyframes card-enter {
+    0%   { transform: translateY(40px) scale(0.7); opacity: 0; }
+    60%  { transform: translateY(-4px) scale(1.02); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  /* ── Card fly-up animation when queued ── */
+  .skill-card.card-fly-up {
+    animation: card-fly-up 0.3s ease-out;
+  }
+  @keyframes card-fly-up {
+    0%   { transform: translateY(0); opacity: 1; }
+    50%  { transform: translateY(-20px); opacity: 0.7; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
 
   /* ── Axie Card Selection Highlight ── */
   .skill-card.card-selected {
-    transform: translateY(-22px) scale(1.06);
-    box-shadow: 0 22px 40px rgba(0,0,0,0.55), 0 0 30px var(--type-glow, rgba(255,229,102,0.5));
+    transform: translateY(-6px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.5), 0 0 16px var(--type-glow, rgba(255,229,102,0.4));
     border-color: #ffe566;
     z-index: 6;
     filter: brightness(1.2);
@@ -801,6 +903,16 @@
     font-family: var(--font-game); font-size: 0.65rem; color: #1a0d05;
     font-weight: 900; z-index: 10;
     box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .card-backdoor-badge {
+    position: absolute; top: -6px; left: -6px;
+    background: linear-gradient(135deg, #ff4444, #cc0000);
+    border-radius: 4px; border: 1px solid rgba(255,255,255,0.3);
+    padding: 1px 5px;
+    font-family: var(--font-game); font-size: 0.5rem; color: #fff;
+    font-weight: 900; z-index: 10; letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(255,0,0,0.4);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
   }
 
   /* ── Combo Badge on Card Group Header ── */
@@ -874,16 +986,7 @@
     box-shadow: 0 0 8px rgba(180,100,255,0.4);
   }
 
-  /* ── Portrait speed order badge ── */
-  .portrait-order {
-    position: absolute; bottom: -4px; right: -4px;
-    width: 14px; height: 14px;
-    background: rgba(0,0,0,0.7);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-game); font-size: 0.42rem; color: #fff;
-  }
+  /* ── Portrait speed order badge (see main portrait-order above) ── */
 
   /* ── Attacking unit flash ── */
   .attacking-unit .unit-sprite {
@@ -1021,6 +1124,40 @@
     100% { opacity:0; transform:translate(-50%,-50%) scale(1.2); }
   }
 
+  /* ── Action banner — shows which side is attacking during resolution ── */
+  .action-banner {
+    position: fixed; top: 38%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-game); font-size: 1.3rem;
+    padding: 8px 24px;
+    border-radius: 10px;
+    z-index: 140; pointer-events: none;
+    animation: action-flash 0.85s ease-out forwards;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    font-weight: bold;
+  }
+  .action-banner.action-player {
+    color: #99ddff;
+    background: rgba(20, 70, 160, 0.85);
+    text-shadow: 0 0 16px rgba(100, 200, 255, 0.8);
+    border: 1.5px solid rgba(100, 200, 255, 0.5);
+    box-shadow: 0 0 20px rgba(50, 150, 255, 0.3);
+  }
+  .action-banner.action-opponent {
+    color: #ff9999;
+    background: rgba(160, 20, 20, 0.85);
+    text-shadow: 0 0 16px rgba(255, 100, 100, 0.8);
+    border: 1.5px solid rgba(255, 100, 100, 0.5);
+    box-shadow: 0 0 20px rgba(255, 50, 50, 0.3);
+  }
+  @keyframes action-flash {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+    70%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.0) translateY(-10px); }
+  }
+
   /* Animation helpers */
   @keyframes faint-shatter {
     0%   { opacity:1; transform:scale(1) rotate(0); filter:grayscale(0); }
@@ -1134,13 +1271,16 @@
     .energy-main-badge { width: 50px; height: 50px; }
     .energy-num { font-size: 1.15rem; }
     #btn-end-turn { padding: 10px 16px; font-size: 0.85rem; min-width: 90px; }
-    .portrait-badge { width: 24px; height: 24px; }
-    .portrait-badge img { width: 18px; height: 18px; }
+    .portrait-badge { width: 32px; height: 32px; }
+    .portrait-badge img { width: 24px; height: 24px; }
+    .portrait-name { font-size: 0.32rem; top: -12px; }
+    .portrait-round-pill { font-size: 0.45rem; padding: 3px 6px; }
+    .field-queued-card { padding: 2px 6px 2px 5px; max-width: 120px; }
+    .field-queued-card .fqc-name { font-size: 0.5rem; max-width: 60px; }
+    .field-queued-card .fqc-order { width: 14px; height: 14px; font-size: 0.45rem; }
   }
   @media (max-width: 600px) {
     .unit-sprite { width: 75px !important; height: 75px !important; }
-    .active-unit  .unit-sprite { width: 95px !important; height: 95px !important; }
-    .benched-unit .unit-sprite { width: 65px !important; height: 65px !important; }
     .unit-hp-badge { min-width: 50px; padding: 2px 5px 3px; }
     .hp-num-display { font-size: 0.6rem; }
     .hp-bar-wrap { height: 4px; }
@@ -1154,9 +1294,10 @@
     #btn-end-turn { padding: 8px 12px; font-size: 0.75rem; min-width: 75px; }
     .battle-nameplate { min-width: 110px; padding: 5px 10px; }
     .nameplate-name { font-size: 0.75rem; }
-    #card-queue-section { padding: 4px 10px; min-height: 44px; }
-    .queue-card { padding: 3px 7px; }
-    .queue-card img { width: 22px; height: 22px; }
+    .field-queued-card { padding: 2px 5px 2px 4px; max-width: 100px; }
+    .field-queued-card .fqc-name { font-size: 0.45rem; max-width: 50px; }
+    .field-queued-card .fqc-order { width: 12px; height: 12px; font-size: 0.4rem; }
+    .field-queued-card .fqc-energy { font-size: 0.45rem; }
   }
   </style>
 </head>
@@ -1204,13 +1345,18 @@
             <span id="energy-player" style="display:inline-flex;gap:3px;align-items:center;font-size:0.65rem;font-family:var(--font-game)">
               ⚡ 3
             </span>
+            <span id="deck-hand-counter" style="display:inline-flex;gap:6px;align-items:center;font-size:0.6rem;font-family:var(--font-game);color:rgba(255,255,255,0.6);margin-left:6px">
+              <span id="deck-count" title="Deck">🃏 12</span>
+              <span id="hand-count" title="Hand">✋ 0</span>
+              <span id="discard-count" title="Discard">♻️ 0</span>
+            </span>
           </span>
         </div>
       </div>
 
       <div id="round-counter-wrap">
         <div id="round-counter">Round 1</div>
-        <div id="turn-phase">Your Turn</div>
+        <!-- <div id="turn-phase">Your Turn</div> -->
         <div id="team-portraits"></div>
       </div>
 
@@ -1252,7 +1398,6 @@
           <div class="combo-fill" style="width:0%"></div>
           <div class="combo-label">Combo</div>
         </div>
-        <span class="combo-hint">Same-Pokémon multi-cards → Combo Burst!</span>
       </div>
 
       <!-- Cards + energy + end turn -->
@@ -1270,7 +1415,7 @@
         <div id="skill-hand"></div>
 
         <div id="end-turn-wrap">
-          <button id="btn-end-turn" disabled>⚔ End Turn</button>
+          <button id="btn-end-turn" disabled>⚔ Skip Turn</button>
           <div class="hint-txt" id="battle-hint">Pick cards → Tap enemy → End Turn!</div>
         </div>
 

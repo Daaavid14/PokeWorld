@@ -18,10 +18,26 @@
 window.BATTLE_DATA = {};
 
 BATTLE_DATA.ENERGY = {
-  MAX:              9,   // max energy (Axie Infinity: capped at 9)
+  MAX:              10,  // max energy (Axie Infinity Classic v1: capped at 10)
   REGEN_PER_ROUND:  2,   // +2 per round (Axie standard)
   START_ENERGY:     3,   // energy both sides begin the first round with
-  MAX_CARDS_PER_TURN: 5, // hard cap on skill cards played per turn
+  // No team-wide card cap — in Axie v1 you can play as many cards as
+  // your energy allows.  A single Axie can play all 4 unique skills
+  // (or even duplicates saved across rounds) in one turn.
+};
+
+/* ============================================================
+   CARD DRAW SYSTEM  (Axie Infinity Classic v1)
+   Deck = 2 copies of each skill per Axie → 8 cards/Axie → 24 total.
+   Start: draw 6.  Each round: draw 3 more into hand (shared pool).
+   Played cards → discard pile. Deck empty → reshuffle discards.
+   Hand limit prevents hoarding.
+   ============================================================ */
+BATTLE_DATA.CARDS = {
+  COPIES_PER_SKILL: 2,   // 2 copies of each skill per Axie (Axie v1 standard)
+  INITIAL_DRAW:     6,   // cards drawn at battle start
+  DRAW_PER_ROUND:   3,   // cards drawn each subsequent round
+  HAND_LIMIT:      10,   // max cards in hand at any time
 };
 
 /* ============================================================
@@ -247,7 +263,7 @@ BATTLE_DATA.SKILLS = {
   ],
   Butterfree: [
     { id:'bfr_psychic',   name:'Psych Up',      type:'psychic', energyCost:1, dmgMulti:1.2, effect:'confuse',    effectChance:30,  stackable:false, comboTrigger:true,  icon:'🔮', description:'Psychic dust confuses foe.' },
-    { id:'bfr_airslash',  name:'Air Slash',     type:'flying',  energyCost:2, dmgMulti:2.0, effect:'paralyze',   effectChance:25,  stackable:false, comboTrigger:true,  icon:'💨', description:'Razor-sharp wings cut through air.' },
+    { id:'bfr_airslash',  name:'Air Slash',     type:'flying',  energyCost:2, dmgMulti:2.0, effect:'paralyze',   effectChance:25,  stackable:false, comboTrigger:true,  icon:'💨', description:'Razor-sharp wings cut through air. Backdoor — flies past the front.', targeting:'backdoor' },
     { id:'bfr_sleeppdr',  name:'Sleep Powder',  type:'grass',   energyCost:1, dmgMulti:0,   effect:'freeze',     effectChance:70,  stackable:false, comboTrigger:false, icon:'💤', description:'Sleeping spores put foe to sleep.' },
     { id:'bfr_bugbuzz',   name:'Bug Buzz',      type:'bug',     energyCost:3, dmgMulti:3.5, effect:'debuff_def', effectChance:50,  stackable:false, comboTrigger:true,  icon:'🎵', description:'ULTIMATE — resonant buzz shreds armor.' },
   ],
@@ -267,7 +283,7 @@ BATTLE_DATA.SKILLS = {
   ],
   Charizard: [
     { id:'cz_fireblast',  name:'Fire Blast',   type:'fire',    energyCost:2, dmgMulti:2.5, effect:'burn',       effectChance:40,  stackable:true,  comboTrigger:true,  icon:'💥', description:'Massive fire column. Stackable.' },
-    { id:'cz_dragonrage', name:'Dragon Rage',  type:'dragon',  energyCost:2, dmgMulti:2.2, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'🐉', description:'Draconic fury is unstoppable.' },
+    { id:'cz_dragonrage', name:'Dragon Rage',  type:'dragon',  energyCost:2, dmgMulti:2.2, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'🐉', description:'Draconic fury is unstoppable. Backdoor — targets the back.', targeting:'backdoor' },
     { id:'cz_earthquake', name:'Earthquake',   type:'ground',  energyCost:3, dmgMulti:2.8, effect:'debuff_def', effectChance:60,  stackable:true,  comboTrigger:false, icon:'🌋', description:'Grounds shake foe to the core.' },
     { id:'cz_blastburn',  name:'Blast Burn',   type:'fire',    energyCost:3, dmgMulti:4.0, effect:'burn',       effectChance:100, stackable:false, comboTrigger:true,  icon:'☄️', description:'ULTIMATE — nuclear fire. Combo = AOE shockwave.' },
   ],
@@ -288,7 +304,7 @@ BATTLE_DATA.SKILLS = {
   Typhlosion: [
     { id:'typ_eruption',  name:'Eruption',      type:'fire',    energyCost:2, dmgMulti:3.0, effect:'burn',       effectChance:70,  stackable:true,  comboTrigger:true,  icon:'🌋', description:'Stackable eruptions intensify.' },
     { id:'typ_fblast',    name:'Fire Blast',    type:'fire',    energyCost:2, dmgMulti:2.6, effect:'burn',       effectChance:45,  stackable:false, comboTrigger:true,  icon:'💥', description:'Giant flame cross.' },
-    { id:'typ_thunder_p', name:'Thunder Punch', type:'electric',energyCost:2, dmgMulti:2.0, effect:'paralyze',   effectChance:30,  stackable:false, comboTrigger:true,  icon:'⚡', description:'Shocking cross-elemental punch.' },
+    { id:'typ_thunder_p', name:'Thunder Punch', type:'electric',energyCost:2, dmgMulti:2.0, effect:'paralyze',   effectChance:30,  stackable:false, comboTrigger:true,  icon:'⚡', description:'Shocking cross-elemental punch. Backdoor — targets the back.', targeting:'backdoor' },
     { id:'typ_blastburn', name:'Blast Burn',    type:'fire',    energyCost:3, dmgMulti:4.2, effect:'burn',       effectChance:100, stackable:false, comboTrigger:true,  icon:'☄️', description:'ULTIMATE — Johto fire deity ultimate.' },
   ],
 
@@ -308,7 +324,7 @@ BATTLE_DATA.SKILLS = {
   Dragonite: [
     { id:'dnt_hurricane', name:'Hurricane',     type:'flying',  energyCost:2, dmgMulti:2.4, effect:'confuse',    effectChance:30,  stackable:false, comboTrigger:true,  icon:'🌪️', description:'Category 5 wing storm.' },
     { id:'dnt_tbolt',     name:'Thunderbolt',   type:'electric',energyCost:2, dmgMulti:2.2, effect:'paralyze',   effectChance:30,  stackable:true,  comboTrigger:true,  icon:'⚡', description:'Stackable electric surge.' },
-    { id:'dnt_extremspd', name:'Extreme Speed', type:'normal',  energyCost:1, dmgMulti:1.8, effect:null,         effectChance:0,   stackable:false, comboTrigger:false, icon:'💨', description:'Fastest normal move.' },
+    { id:'dnt_extremspd', name:'Extreme Speed', type:'normal',  energyCost:1, dmgMulti:1.8, effect:null,         effectChance:0,   stackable:false, comboTrigger:false, icon:'💨', description:'Fastest normal move. Backdoor — blitzes past the front.', targeting:'backdoor' },
     { id:'dnt_dragonrush',name:'Dragon Rush',   type:'dragon',  energyCost:3, dmgMulti:4.2, effect:'paralyze',   effectChance:60,  stackable:false, comboTrigger:true,  icon:'🐉', description:'ULTIMATE — flying dragon charge obliterates.' },
   ],
 
@@ -327,7 +343,7 @@ BATTLE_DATA.SKILLS = {
   ],
   Jolteon: [
     { id:'jol_tbolt',     name:'Thunderbolt',   type:'electric',energyCost:2, dmgMulti:2.0, effect:'paralyze',   effectChance:25,  stackable:true,  comboTrigger:true,  icon:'⚡', description:'Stackable lightning bolt.' },
-    { id:'jol_pinmissle', name:'Pin Missile',   type:'bug',     energyCost:1, dmgMulti:1.4, effect:null,         effectChance:0,   stackable:false, comboTrigger:false, icon:'📌', description:'Multi-spike barrage.' },
+    { id:'jol_pinmissle', name:'Pin Missile',   type:'bug',     energyCost:1, dmgMulti:1.4, effect:null,         effectChance:0,   stackable:false, comboTrigger:false, icon:'📌', description:'Multi-spike barrage. Backdoor — needles reach the back.', targeting:'backdoor' },
     { id:'jol_thunder',   name:'Thunder',       type:'electric',energyCost:2, dmgMulti:2.4, effect:'paralyze',   effectChance:30,  stackable:false, comboTrigger:true,  icon:'🌩️', description:'Supreme thunderstrike.' },
     { id:'jol_discharge', name:'Discharge',     type:'electric',energyCost:3, dmgMulti:3.6, effect:'paralyze',   effectChance:50,  stackable:false, comboTrigger:true,  icon:'⚡', description:'ULTIMATE — AoE electric discharge.' },
   ],
@@ -366,7 +382,7 @@ BATTLE_DATA.SKILLS = {
     { id:'hnt_nightmare',  name:'Nightmare',     type:'ghost',   energyCost:3, dmgMulti:2.8, effect:'burn',       effectChance:100, stackable:false, comboTrigger:true,  icon:'💀', description:'ULTIMATE — induces lethal nightmare.' },
   ],
   Gengar: [
-    { id:'gng_shadowball', name:'Shadow Ball',   type:'ghost',   energyCost:2, dmgMulti:2.4, effect:'debuff_def', effectChance:30,  stackable:true,  comboTrigger:true,  icon:'🌑', description:'Stackable ghost orb.' },
+    { id:'gng_shadowball', name:'Shadow Ball',   type:'ghost',   energyCost:2, dmgMulti:2.4, effect:'debuff_def', effectChance:30,  stackable:true,  comboTrigger:true,  icon:'🌑', description:'Stackable ghost orb. Backdoor — phases through front.', targeting:'backdoor' },
     { id:'gng_sludgebomb', name:'Sludge Bomb',   type:'poison',  energyCost:2, dmgMulti:2.0, effect:'burn',       effectChance:50,  stackable:false, comboTrigger:true,  icon:'☠️', description:'Toxic explosion.' },
     { id:'gng_psych',      name:'Psychic',       type:'psychic', energyCost:2, dmgMulti:2.2, effect:'debuff_def', effectChance:35,  stackable:false, comboTrigger:true,  icon:'🔮', description:'Psychokinetic crushing force.' },
     { id:'gng_destbond',   name:'Shadow Pulse',  type:'ghost',   energyCost:3, dmgMulti:4.0, effect:'burn',       effectChance:80,  stackable:false, comboTrigger:true,  icon:'💀', description:'ULTIMATE — dimension-rending ghost pulse.' },
@@ -468,7 +484,7 @@ BATTLE_DATA.SKILLS = {
   Raichu: [
     { id:'rch_thunder',    name:'Thunder',      type:'electric',energyCost:2, dmgMulti:2.8, effect:'paralyze',   effectChance:35,  stackable:true,  comboTrigger:true,  icon:'🌩️', description:'Stackable thunder giant.' },
     { id:'rch_tbolt',      name:'Thunderbolt',  type:'electric',energyCost:2, dmgMulti:2.4, effect:'paralyze',   effectChance:25,  stackable:false, comboTrigger:true,  icon:'⚡', description:'Supercharged bolt.' },
-    { id:'rch_focusblast', name:'Focus Blast',  type:'fighting',energyCost:2, dmgMulti:2.2, effect:'debuff_def', effectChance:35,  stackable:false, comboTrigger:true,  icon:'💥', description:'Fighting aura shockwave.' },
+    { id:'rch_focusblast', name:'Focus Blast',  type:'fighting',energyCost:2, dmgMulti:2.2, effect:'debuff_def', effectChance:35,  stackable:false, comboTrigger:true,  icon:'💥', description:'Fighting aura shockwave. Backdoor — targets the back.', targeting:'backdoor' },
     { id:'rch_discharge',  name:'Discharge',    type:'electric',energyCost:3, dmgMulti:4.0, effect:'paralyze',   effectChance:55,  stackable:false, comboTrigger:true,  icon:'⚡', description:'ULTIMATE — full-body electric surge.' },
   ],
 
@@ -487,7 +503,7 @@ BATTLE_DATA.SKILLS = {
   ],
   Pidgeot: [
     { id:'pdt_hurricane', name:'Hurricane',     type:'flying',  energyCost:2, dmgMulti:2.6, effect:'confuse',    effectChance:35,  stackable:true,  comboTrigger:true,  icon:'🌪️', description:'Stackable Category 5 storm.' },
-    { id:'pdt_aerialace', name:'Aerial Ace',    type:'flying',  energyCost:1, dmgMulti:2.0, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'✈️', description:'Supersonic strike.' },
+    { id:'pdt_aerialace', name:'Aerial Ace',    type:'flying',  energyCost:1, dmgMulti:2.0, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'✈️', description:'Supersonic strike. Backdoor — flies over the front line.', targeting:'backdoor' },
     { id:'pdt_airslash',  name:'Air Slash',     type:'flying',  energyCost:2, dmgMulti:2.4, effect:'paralyze',   effectChance:25,  stackable:false, comboTrigger:true,  icon:'💨', description:'Razor-sharp air blade.' },
     { id:'pdt_hyperbeam', name:'Hyper Beam',    type:'normal',  energyCost:3, dmgMulti:4.2, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'☄️', description:'ULTIMATE — king of the skies final attack.' },
   ],
@@ -547,7 +563,7 @@ BATTLE_DATA.SKILLS = {
   ],
   Blaziken: [
     { id:'bzk_blazekick', name:'Blaze Kick',    type:'fire',    energyCost:2, dmgMulti:2.6, effect:'burn',       effectChance:50,  stackable:true,  comboTrigger:true,  icon:'🔥', description:'Stackable legendary kick.' },
-    { id:'bzk_highjump',  name:'High Jump Kick',type:'fighting',energyCost:2, dmgMulti:2.4, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'🦵', description:'Soaring heel drop.' },
+    { id:'bzk_highjump',  name:'High Jump Kick',type:'fighting',energyCost:2, dmgMulti:2.4, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'🦵', description:'Soaring heel drop. Backdoor — leaps over the front.', targeting:'backdoor' },
     { id:'bzk_flamethrow',name:'Flamethrower',  type:'fire',    energyCost:2, dmgMulti:2.2, effect:'burn',       effectChance:35,  stackable:false, comboTrigger:true,  icon:'🔥', description:'Cross-combo flame stream.' },
     { id:'bzk_overheat',  name:'Overheat',      type:'fire',    energyCost:3, dmgMulti:4.2, effect:'burn',       effectChance:100, stackable:false, comboTrigger:true,  icon:'☄️', description:'ULTIMATE — nuclear blaziken explosion.' },
   ],
@@ -641,8 +657,85 @@ BATTLE_DATA.DEFAULT_SKILLS = [
   { id:'def_hyper',   name:'Hyper Beam',   type:'normal', energyCost:3, dmgMulti:3.8, effect:null,         effectChance:0,   stackable:false, comboTrigger:true,  icon:'☄️', description:'ULTIMATE beam.' },
 ];
 
+/* ============================================================
+   SAME-CLASS BONUS  (Axie Infinity)
+   Using a card type that matches the caster's type → +10% ATK & Shield
+   ============================================================ */
+BATTLE_DATA.SAME_CLASS = {
+  ATK_BONUS:    0.10,   // +10% attack when card type === caster type
+  SHIELD_BONUS: 0.10,   // +10% shield when card type === caster type
+};
+
+/* ============================================================
+   CHAIN BONUS  (Axie Infinity)
+   Playing cards of the same type across different Pokémon in
+   one round triggers a small shield boost on each participant.
+   ============================================================ */
+BATTLE_DATA.CHAIN = {
+  MIN_PARTICIPANTS: 2,   // need 2+ different Pokémon using same-type cards
+  SHIELD_BONUS:     8,   // flat shield% bonus per chained action
+};
+
+/* ============================================================
+   COMBO FORMULA  (Axie Infinity)
+   Combo when 2+ cards on a single Axie in one turn.
+   Bonus = (Card Attack × Skill) / 500  per extra card
+   ============================================================ */
+BATTLE_DATA.COMBO_FORMULA = {
+  SKILL_DIVISOR: 500,   // bonus = (cardAtk * skill) / 500
+};
+
+/* ============================================================
+   FORMATION SYSTEM  (Axie Infinity Front-Mid-Back)
+   ──────────────────────────────────────────────────────────
+   Positions:
+     0 = FRONT  (Tank)   — absorbs hits, high HP & DEF
+     1 = MID    (Support) — utility / bruiser mix
+     2 = BACK   (Carry)  — high SPD & ATK, protected by front
+
+   Enemies always target the front-most alive Pokémon first.
+   Type hints map each Pokémon type to a preferred role so
+   auto-formation places them sensibly.
+
+   TARGETING SYSTEM:
+     Default = always hit front-most alive enemy (FRONT → MID → BACK)
+     'backdoor' = bypasses front, hits BACK-MOST alive enemy (BACK → MID → FRONT)
+     Backdoor skills are marked with targeting:'backdoor' in SKILLS definitions.
+   ============================================================ */
+BATTLE_DATA.FORMATION = {
+  POSITIONS: ['FRONT', 'MID', 'BACK'],
+  LABELS:    { 0: '🛡️ FRONT', 1: '⚔️ MID', 2: '🎯 BACK' },
+  SHORT:     { 0: 'FRONT', 1: 'MID', 2: 'BACK' },
+
+  // Type → preferred position index (0 front, 1 mid, 2 back)
+  TYPE_ROLE: {
+    grass:     0,  // tanky / plant-like → front
+    rock:      0,
+    ground:    0,
+    ice:       0,
+    steel:     0,
+    fighting:  1,  // bruiser → mid
+    poison:    1,
+    bug:       1,
+    fairy:     1,
+    normal:    1,
+    fire:      2,  // attacker → back
+    water:     2,
+    electric:  2,
+    flying:    2,
+    psychic:   2,
+    ghost:     2,
+    dragon:    2,
+    dark:      2,
+  },
+};
+
 /* Freeze protection */
 Object.freeze(BATTLE_DATA.ENERGY);
 Object.freeze(BATTLE_DATA.COMBO);
 Object.freeze(BATTLE_DATA.MORALE);
 Object.freeze(BATTLE_DATA.LAST_STAND);
+Object.freeze(BATTLE_DATA.SAME_CLASS);
+Object.freeze(BATTLE_DATA.CHAIN);
+Object.freeze(BATTLE_DATA.COMBO_FORMULA);
+Object.freeze(BATTLE_DATA.FORMATION);
